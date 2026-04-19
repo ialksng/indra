@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, Mic, MicOff, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp } from 'lucide-react';
+import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 export default function ChatCore({ projectId = 'default', isCompact = false }) {
@@ -10,7 +10,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [selectedModel, setSelectedModel] = useState('gemini-flash');
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [activeVideoSource, setActiveVideoSource] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null); 
   
   const messagesEndRef = useRef(null);
@@ -105,33 +104,43 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     if (isLoading) return;
 
     let imageToSend = selectedImage;
-    
     if (activeVideoSource) {
       imageToSend = captureVideoFrame();
     }
 
     if (!input.trim() && !imageToSend) return;
 
-    const userMsg = { 
-      role: 'user', 
+    const userMsg = {
+      role: 'user',
       text: input,
-      image: imageToSend 
+      image: imageToSend
     };
 
     const textToSend = input;
     setInput('');
     setSelectedImage(null);
-    setMessages(prev => [...prev, userMsg]);
+
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setIsLoading(true);
 
     try {
-      const res = await apiClient.post('/chat', { 
+      const res = await apiClient.post('/chat', {
         message: textToSend,
         image: imageToSend,
         modelType: selectedModel,
-        projectId: projectId,
-        history: messages
+        projectId,
+        history: updatedMessages
       });
+
+      if (res.data.actionInstruction) {
+        const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
+        window.parent.postMessage({
+          type: 'INDRA_ACTION',
+          payload: res.data.actionInstruction
+        }, targetOrigin);
+      }
+
       setMessages(prev => [...prev, { role: 'ai', text: res.data.reply }]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', text: 'Error connecting to Indra.' }]);
@@ -196,10 +205,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         
         {showUploadMenu && (
           <div className="absolute bottom-16 left-2 bg-slate-700 border border-slate-600 rounded-lg shadow-xl p-2 flex flex-col gap-1 z-50">
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-600 rounded-md text-sm text-left w-full transition-colors">
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-600 rounded-md text-sm w-full">
               <HardDrive size={16} className="text-blue-400" /> Device Upload
             </button>
-            <button onClick={handleSmartSphereUpload} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-600 rounded-md text-sm text-left w-full transition-colors">
+            <button onClick={handleSmartSphereUpload} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-600 rounded-md text-sm w-full">
               <Database size={16} className="text-emerald-400" /> SmartSphere Vault
             </button>
           </div>
@@ -208,15 +217,15 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         <div className="flex items-center gap-1">
           <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
           
-          <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-gray-400 hover:text-white transition-colors">
+          <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-gray-400 hover:text-white">
             <ImagePlus size={20} />
           </button>
 
-          <button onClick={toggleCamera} className={`p-2 transition-colors rounded-full ${activeVideoSource === 'camera' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}>
+          <button onClick={toggleCamera} className={`p-2 rounded-full ${activeVideoSource === 'camera' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}>
             <Camera size={20} />
           </button>
 
-          <button onClick={toggleScreenShare} className={`p-2 transition-colors rounded-full ${activeVideoSource === 'screen' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'}`}>
+          <button onClick={toggleScreenShare} className={`p-2 rounded-full ${activeVideoSource === 'screen' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'}`}>
             <MonitorUp size={20} />
           </button>
 
