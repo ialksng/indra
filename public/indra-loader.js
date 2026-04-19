@@ -69,6 +69,7 @@
   const iframe = document.createElement('iframe');
   iframe.id = 'indra-iframe';
   iframe.src = `https://indra.ialksng.me/widget?projectId=${projectId}`;
+  iframe.allow = "camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write";
 
   const button = document.createElement('button');
   button.id = 'indra-toggle-btn';
@@ -128,3 +129,8 @@
     }
   });
 })();
+
+const iframe = document.createElement('iframe');
+iframe.id = 'indra-iframe';
+iframe.src = `https://indra.ialksng.me/widget?projectId=${projectId}`; 
+iframe.allow = "camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write";

@@ -179,30 +179,44 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       </div>
 
       {activeVideoSource && (
-        <div className="p-2 bg-slate-800 border-t border-slate-700 flex justify-center">
-          <div className="relative rounded-lg overflow-hidden border-2 border-purple-500 max-w-full">
+        <div className={`p-2 bg-slate-800 border-t border-slate-700 flex justify-center ${activeVideoSource ? 'flex' : 'hidden'}`}>
+            <div className="relative rounded-lg overflow-hidden border-2 border-purple-500 max-w-full">
             <video 
-              ref={videoRef} 
-              className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'transform scale-x-[-1]' : ''}`} 
-              muted 
-              playsInline 
+                ref={videoRef} 
+                className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'transform scale-x-[-1]' : ''}`} 
+                muted 
+                playsInline 
             />
             <span className="absolute top-1 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">
-              {activeVideoSource === 'screen' ? 'SHARING SCREEN' : 'LIVE'}
+                {activeVideoSource === 'screen' ? 'SHARING SCREEN' : 'LIVE'}
             </span>
             <button 
-              onClick={stopVideo}
-              className="absolute top-1 right-2 bg-slate-900/80 p-1 rounded-full text-white hover:bg-red-500 transition-colors"
+                onClick={stopVideo}
+                className="absolute top-1 right-2 bg-slate-900/80 p-1 rounded-full text-white hover:bg-red-500 transition-colors"
             >
-              <X size={14} />
+                <X size={14} />
             </button>
-          </div>
-          <canvas ref={canvasRef} className="hidden" />
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
 
       <div className="p-3 bg-slate-800/50 border-t border-slate-700 flex flex-col gap-2 relative">
         
+        {selectedImage && (
+          <div className="absolute -top-20 left-2 bg-slate-700 p-2 rounded-lg border border-slate-600 shadow-xl z-10">
+            <div className="relative">
+              <img src={selectedImage} alt="Preview" className="h-16 w-16 object-cover rounded border border-slate-500" />
+              <button 
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {showUploadMenu && (
           <div className="absolute bottom-16 left-2 bg-slate-700 border border-slate-600 rounded-lg shadow-xl p-2 flex flex-col gap-1 z-50">
             <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-600 rounded-md text-sm w-full">
