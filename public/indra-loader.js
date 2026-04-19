@@ -88,4 +88,43 @@
   container.appendChild(iframe);
   container.appendChild(button);
   document.body.appendChild(container);
+
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+
+    if (data.type === 'INDRA_ACTION') {
+      const { action, selector, value } = data.payload;
+      console.log(`[Indra Agent] Executing: ${action} on ${selector}`);
+
+      try {
+        const element = document.querySelector(selector);
+        
+        if (!element) {
+          console.warn(`[Indra Agent] Element not found: ${selector}`);
+          return;
+        }
+
+        switch (action) {
+          case 'click':
+            element.click();
+            break;
+          case 'fill':
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            break;
+          case 'navigate':
+            window.location.href = value;
+            break;
+          case 'scroll':
+            element.scrollIntoView({ behavior: 'smooth' });
+            break;
+          default:
+            console.warn(`[Indra Agent] Unknown action: ${action}`);
+        }
+      } catch (error) {
+        console.error('[Indra Agent] Action failed:', error);
+      }
+    }
+  });
 })();
