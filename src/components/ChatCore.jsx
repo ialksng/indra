@@ -313,14 +313,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
               <Zap className="text-amber-500" size={24} />
             </div>
             <p className="text-slate-400 text-sm mb-4 max-w-xs">Ready to automate this page or answer questions from your SmartSphere vault.</p>
-            {isCompact && (
-              <button 
-                onClick={() => window.open('https://indra.ialksng.me', '_blank', 'noopener,noreferrer')}
-                className="text-xs font-bold text-amber-500 hover:text-amber-400 uppercase tracking-widest transition-colors"
-              >
-                Launch Full Workspace
-              </button>
-            )}
           </div>
         )}
 
