@@ -7,7 +7,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const [selectedModel, setSelectedModel] = useState('gemini-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash');
   const [automationEnabled, setAutomationEnabled] = useState(false); 
   
   const [showUploadMenu, setShowUploadMenu] = useState(false);
@@ -27,8 +27,8 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   }, [messages]);
 
   const models = [
-    { id: 'gemini-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
     { id: 'groq-llama-3', name: 'Groq Llama-3.3 70B' },
     { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B' },
     { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
@@ -220,7 +220,11 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         domMap: currentDomMap,
         vaultData: selectedModel === 'smartsphere-rag' ? vaultData : null,
         projectId,
-        history: updatedMessages
+        history: updatedMessages.map(m => ({
+          role: m.role === 'ai' ? 'model' : m.role,
+          text: m.text,
+          ...(m.image && { image: m.image })
+        }))
       });
 
       const aiMessage = { role: 'ai', text: res.data.reply };
@@ -229,6 +233,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       }
       setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
+      console.error(err);
       setMessages(prev => [...prev, { role: 'ai', text: 'Error connecting to Indra.' }]);
     } finally {
       setIsLoading(false);

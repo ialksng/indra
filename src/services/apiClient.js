@@ -7,10 +7,14 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
     const userInfo = localStorage.getItem('userInfo'); 
     
-    if (userInfo) {
-        const parsed = JSON.parse(userInfo);
-        if (parsed.token) {
-            config.headers.Authorization = `Bearer ${parsed.token}`;
+    if (userInfo && userInfo !== "undefined") {
+        try {
+            const parsed = JSON.parse(userInfo);
+            if (parsed && parsed.token) {
+                config.headers.Authorization = `Bearer ${parsed.token}`;
+            }
+        } catch (e) {
+            console.error("[Indra] Token parsing failed:", e);
         }
     }
     return config;

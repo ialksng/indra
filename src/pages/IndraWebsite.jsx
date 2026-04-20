@@ -56,7 +56,7 @@ export default function IndraWebsite() {
               style={{ backgroundColor: "#FACC15" }}
             ></div>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-500">INDRA</h1>
+          <h1 className="text-2xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-500"></h1>
         </div>
         
         {/* NAV */}
