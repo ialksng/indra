@@ -105,19 +105,15 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setShowUploadMenu(false);
   };
 
-  // --- UPDATED: Chrome Extension Action Execution with Safety Checks ---
   const approveAction = (actionDetails, messageIndex) => {
-    // 1. Try Chrome Extension execution
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const activeTab = tabs[0];
         if (activeTab?.id) {
-          // Check for forbidden URLs before executing
           if (activeTab.url && (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('edge://') || activeTab.url.startsWith('about:'))) {
             console.warn("[Indra] Cannot execute actions on internal browser pages.");
             return;
           }
-
           chrome.tabs.sendMessage(activeTab.id, { 
             type: 'EXECUTE_ACTION', 
             payload: actionDetails 
@@ -129,7 +125,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         }
       });
     } else {
-      // 2. Fallback to old Iframe method if testing outside extension
       const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
       window.parent.postMessage({ type: 'INDRA_ACTION', payload: actionDetails }, targetOrigin);
     }
@@ -149,44 +144,37 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     });
   };
 
-  // --- UPDATED: Chrome Extension DOM Fetcher with Defensive Programming ---
   const fetchDomMap = () => {
     return new Promise((resolve) => {
       if (!automationEnabled) return resolve([]);
 
-      // 1. Try fetching via Chrome Extension API (Real-time active tab)
       if (typeof chrome !== 'undefined' && chrome.tabs) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           const activeTab = tabs[0];
           if (!activeTab?.id) return resolve([]);
           
-          // CRITICAL FIX: Do not attempt to inject or message forbidden Chrome pages
           if (activeTab.url && (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('edge://') || activeTab.url.startsWith('about:'))) {
             console.warn("[Indra] Cannot run Web Agent on internal browser pages.");
-            return resolve([]); // Gracefully return empty map
+            return resolve([]); 
           }
 
           chrome.tabs.sendMessage(activeTab.id, { type: 'GET_LIVE_CONTEXT' }, (response) => {
-            // Handle the "Receiving end does not exist" error silently
             if (chrome.runtime.lastError) {
                console.warn("[Indra] Content script not found. Did you refresh the page?");
                return resolve([]);
             }
             if (!response) return resolve([]);
-
-            console.log("Real-time map from active tab:", response.map);
             resolve(response.map);
           });
         });
       } 
-      // 2. Fallback for testing in browser (localhost)
       else {
         const elements = document.querySelectorAll('a, button, input, select, textarea');
         const map = [];
         let idCounter = 0;
 
         elements.forEach((el) => {
-          if (el.closest('#indra-chat-core-container')) return; // Ignore chat UI
+          if (el.closest('#indra-chat-core-container')) return; 
           const rect = el.getBoundingClientRect();
           if (rect.width === 0 || rect.height === 0) return;
 
@@ -198,7 +186,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
             map.push({ type: el.tagName.toLowerCase(), text: textContent, selector: `[data-indra-id="${indraId}"]` });
           }
         });
-        console.log("Map generated natively (Fallback):", map);
         resolve(map);
       }
     });
@@ -251,7 +238,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   return (
     <div id="indra-chat-core-container" className="flex flex-col h-full w-full bg-slate-900 text-white relative">
       
-      {/* --- SMARTSPHERE MODAL --- */}
+      {/* SMARTSPHERE MODAL */}
       {isVaultOpen && (
         <div className="absolute inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-800 border border-slate-600 rounded-xl w-full max-w-md p-5 flex flex-col gap-4 shadow-2xl">
@@ -293,14 +280,12 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           <ChevronDown size={16} className="absolute right-3 top-2.5 pointer-events-none text-gray-400" />
         </div>
 
-        {/* Llama Vision Warning */}
         {selectedModel.startsWith('groq') && (selectedImage || activeVideoSource) && (
           <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-1 rounded">
             <ShieldAlert size={12} /> Llama 3 is text-only
           </div>
         )}
 
-        {/* AUTOMATION TOGGLE */}
         <label className="flex items-center gap-2 cursor-pointer bg-slate-700 px-3 py-2 rounded-lg border border-slate-600 hover:bg-slate-600 transition-colors">
           <input 
             type="checkbox" 
@@ -318,14 +303,45 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         </label>
       </div>
 
-      {/* CHAT HISTORY */}
+      {/* CHAT HISTORY & EMPTY STATE */}
       <div className={`flex-1 overflow-y-auto ${isCompact ? 'p-3 space-y-4' : 'p-6 space-y-6'}`}>
+        
+        {/* EMPTY STATE */}
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center p-6 mt-10">
+            <img 
+              src="/favicon.svg" 
+              alt="Indra" 
+              className="w-16 h-16 mb-4 opacity-70 drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]" 
+              onError={(e) => { e.target.style.display = 'none' }}
+            />
+            <p className="text-slate-400 text-sm mb-4">I can help you automate this page or answer questions from your vault.</p>
+            {isCompact && (
+              <button 
+                onClick={() => window.open('https://indra.ialksng.me', '_blank', 'noopener,noreferrer')}
+                className="text-xs font-bold text-amber-500 hover:text-amber-400 uppercase tracking-widest transition-colors"
+              >
+                Launch Full Workspace
+              </button>
+            )}
+          </div>
+        )}
+
         {messages.map((msg, i) => (
           <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-            
             <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} max-w-[90%]`}>
-              {msg.role !== 'user' && !isCompact && <Bot className="text-purple-400 mt-1 shrink-0" size={20} />}
-              <div className={`p-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600' : 'bg-slate-800 border border-slate-700'}`}>
+              
+              {/* Message Avatar */}
+              {msg.role !== 'user' && !isCompact && (
+                <img 
+                  src="/favicon.svg" 
+                  alt="Indra" 
+                  className="w-6 h-6 mt-2 shrink-0 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" 
+                  onError={(e) => { e.target.style.display = 'none' }}
+                />
+              )}
+              
+              <div className={`p-3 rounded-2xl ${msg.role === 'user' ? 'bg-amber-600 text-slate-950 font-medium' : 'bg-slate-800 border border-slate-700 text-slate-200'}`}>
                 {msg.image && <img src={msg.image} className="rounded-lg mb-2 max-h-48 object-cover" alt="attachment"/>}
                 <p className={isCompact ? 'text-sm whitespace-pre-wrap' : 'text-base whitespace-pre-wrap'}>{msg.text}</p>
               </div>
@@ -360,10 +376,9 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
                 {msg.pendingAction.status === 'denied' && <span className="text-xs text-red-400 font-bold">✗ Action Denied</span>}
               </div>
             )}
-            
           </div>
         ))}
-        {isLoading && <Loader2 className="animate-spin text-purple-400 m-4" size={20} />}
+        {isLoading && <Loader2 className="animate-spin text-amber-500 m-4" size={20} />}
         <div ref={messagesEndRef} />
       </div>
 
@@ -420,15 +435,15 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         <div className="flex items-center gap-1">
           <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
           
-          <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-gray-400 hover:text-white" title="Attach">
+          <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-gray-400 hover:text-amber-400" title="Attach">
             <ImagePlus size={20} />
           </button>
 
-          <button onClick={toggleCamera} className={`p-2 rounded-full ${activeVideoSource === 'camera' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`} title="Camera">
+          <button onClick={toggleCamera} className={`p-2 rounded-full ${activeVideoSource === 'camera' ? 'bg-amber-500 text-slate-950' : 'text-gray-400 hover:text-amber-400'}`} title="Camera">
             <Camera size={20} />
           </button>
 
-          <button onClick={toggleScreenShare} className={`p-2 rounded-full ${activeVideoSource === 'screen' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'}`} title="Screen Share">
+          <button onClick={toggleScreenShare} className={`p-2 rounded-full ${activeVideoSource === 'screen' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-blue-400'}`} title="Screen Share">
             <MonitorUp size={20} />
           </button>
 
@@ -437,10 +452,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder={activeVideoSource ? "Ask about what I'm seeing..." : "Type a message..."}
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 ml-1 focus:outline-none focus:border-purple-500"
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 ml-1 focus:outline-none focus:border-amber-500 text-slate-200"
           />
           
-          <button onClick={handleSend} disabled={isLoading || (!input.trim() && !activeVideoSource && !selectedImage)} className="p-2 ml-1 bg-purple-600 hover:bg-purple-500 rounded-lg disabled:opacity-50 text-white">
+          <button onClick={handleSend} disabled={isLoading || (!input.trim() && !activeVideoSource && !selectedImage)} className="p-2 ml-1 bg-amber-500 hover:bg-amber-400 rounded-lg disabled:opacity-50 text-slate-950">
             <Send size={18} />
           </button>
         </div>
