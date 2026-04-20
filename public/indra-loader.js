@@ -2,7 +2,10 @@
   if (window.IndraWidgetLoaded) return;
   window.IndraWidgetLoaded = true;
 
+  // 1. Get the script tag that loaded this file
   const scriptTag = document.currentScript;
+  
+  // 2. Extract the Project ID (default to 'default' if not provided)
   const projectId = scriptTag.getAttribute('data-project-id') || 'default';
 
   const style = document.createElement('style');
@@ -13,7 +16,6 @@
     #indra-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(147, 51, 234, 0.6); }
     #indra-toggle-btn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
     
-    /* NEW: Visual feedback animation for AI actions */
     @keyframes indraAgentPulse {
       0% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.7); outline: 2px solid #9333ea; }
       70% { box-shadow: 0 0 0 10px rgba(147, 51, 234, 0); outline: 2px solid rgba(147, 51, 234, 0.5); }
@@ -30,7 +32,9 @@
 
   const iframe = document.createElement('iframe');
   iframe.id = 'indra-iframe';
-  iframe.src = `https://indra.ialksng.me/widget?projectId=${projectId}`;
+  
+  // 3. Pass the Project ID to your hosted widget UI via URL parameters
+  iframe.src = `https://indra.ialksng.me/#/widget?projectId=${projectId}`;
   iframe.allow = "camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write";
 
   const button = document.createElement('button');
@@ -59,6 +63,7 @@
   };
 
   window.addEventListener('message', (event) => {
+    // SECURITY: Only accept messages from your domain!
     if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return; 
 
     const data = event.data;
@@ -70,14 +75,10 @@
         let idCounter = 0;
 
         elements.forEach((el) => {
-            // Ignore the widget itself
             if (el.closest('#indra-widget-container')) return;
-            
-            // Ignore invisible elements
             const rect = el.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) return;
 
-            // Inject an exact targeting ID
             const indraId = 'indra-element-' + (idCounter++);
             el.setAttribute('data-indra-id', indraId);
 
@@ -93,7 +94,6 @@
             }
         });
 
-        // Send the map back to the iframe
         iframe.contentWindow.postMessage({ type: 'DOM_MAP_RESPONSE', payload: map }, '*');
     }
 
@@ -110,7 +110,6 @@
           return;
         }
 
-        // Apply visual feedback
         highlightElement(element);
 
         switch (action) {

@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
-import ChatCore from '../components/ChatCore';
 import { Bot } from 'lucide-react';
+import ChatCore from '../components/ChatCore';
 
 export default function IndraWidget() {
   const [searchParams] = useSearchParams();
@@ -12,8 +12,8 @@ export default function IndraWidget() {
         <Bot size={20} className="text-white" />
         <span className="text-white font-medium text-sm">Chat with Indra</span>
       </div>
-    
       <div className="flex-1 overflow-hidden">
+
         <ChatCore projectId={projectId} isCompact={true} />
       </div>
     </div>
