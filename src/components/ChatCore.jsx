@@ -86,7 +86,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
 
       const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
+      const response = await fetch(`${baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: messagePayload, image: imageToSend, modelType: selectedModel, allowAutomation: automationEnabled, history: messages, projectId })
