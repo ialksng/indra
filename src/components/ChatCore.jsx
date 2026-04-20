@@ -13,10 +13,13 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null); 
+
+  // --- SMARTSPHERE STATE ---
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [vaultData, setVaultData] = useState('');
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -28,11 +31,11 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     { id: 'gemini-flash', name: 'Gemini 1.5 Flash' },
     { id: 'gemini-pro', name: 'Gemini 1.5 Pro' },
     { id: 'groq-llama-3', name: 'Groq Llama-3.3 70B' },
-    { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B (Fast)' }, // Updated label
+    { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B' },
     { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
   ];
 
-  const stopVideo = () => {
+  const stopVideo = () => { /* ... existing stopVideo code ... */
     if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
@@ -40,7 +43,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setActiveVideoSource(null);
   };
 
-  const toggleCamera = async () => {
+  const toggleCamera = async () => { /* ... existing toggleCamera code ... */
     if (activeVideoSource === 'camera') {
       stopVideo();
     } else {
@@ -52,13 +55,11 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           videoRef.current.play();
         }
         setActiveVideoSource('camera');
-      } catch (err) {
-        console.warn("Camera access denied or unavailable", err);
-      }
+      } catch (err) {}
     }
   };
 
-  const toggleScreenShare = async () => {
+  const toggleScreenShare = async () => { /* ... existing toggleScreenShare code ... */
     if (activeVideoSource === 'screen') {
       stopVideo();
     } else {
@@ -70,17 +71,12 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           videoRef.current.play();
         }
         setActiveVideoSource('screen');
-
-        stream.getVideoTracks()[0].onended = () => {
-          stopVideo();
-        };
-      } catch (err) {
-        console.warn("Screen share denied/cancelled", err);
-      }
+        stream.getVideoTracks()[0].onended = () => stopVideo();
+      } catch (err) {}
     }
   };
 
-  const captureVideoFrame = () => {
+  const captureVideoFrame = () => { /* ... existing captureVideoFrame code ... */
     if (!activeVideoSource || !videoRef.current || !canvasRef.current) return null;
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -90,7 +86,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     return canvas.toDataURL('image/jpeg', 0.8);
   };
 
-  const handleDeviceUpload = (e) => {
+  const handleDeviceUpload = (e) => { /* ... existing handleDeviceUpload code ... */
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -101,18 +97,15 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     reader.readAsDataURL(file);
   };
 
+  // --- SMARTSPHERE HANDLER ---
   const handleSmartSphereUpload = () => {
-    alert("Opening SmartSphere Vault...");
+    setIsVaultOpen(true);
     setShowUploadMenu(false);
   };
 
-  const approveAction = (actionDetails, messageIndex) => {
+  const approveAction = (actionDetails, messageIndex) => { /* ... existing approveAction code ... */
     const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
-    window.parent.postMessage({
-      type: 'INDRA_ACTION',
-      payload: actionDetails
-    }, targetOrigin);
-
+    window.parent.postMessage({ type: 'INDRA_ACTION', payload: actionDetails }, targetOrigin);
     setMessages(prev => {
       const newMessages = [...prev];
       newMessages[messageIndex].pendingAction.status = 'approved';
@@ -120,7 +113,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     });
   };
 
-  const denyAction = (messageIndex) => {
+  const denyAction = (messageIndex) => { /* ... existing denyAction code ... */
     setMessages(prev => {
       const newMessages = [...prev];
       newMessages[messageIndex].pendingAction.status = 'denied';
@@ -133,19 +126,12 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     if (isLoading) return;
 
     let imageToSend = selectedImage;
-    if (activeVideoSource) {
-      imageToSend = captureVideoFrame();
-    }
-
+    if (activeVideoSource) imageToSend = captureVideoFrame();
     if (!input.trim() && !imageToSend) return;
 
-    const userMsg = {
-      role: 'user',
-      text: input,
-      image: imageToSend
-    };
-
+    const userMsg = { role: 'user', text: input, image: imageToSend };
     const textToSend = input;
+    
     setInput('');
     setSelectedImage(null);
 
@@ -158,23 +144,16 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         message: textToSend,
         image: imageToSend,
         modelType: selectedModel,
-        allowAutomation: automationEnabled, 
+        allowAutomation: automationEnabled,
+        vaultData: selectedModel === 'smartsphere-rag' ? vaultData : null, // --- INJECT VAULT DATA ---
         projectId,
         history: updatedMessages
       });
 
-      const aiMessage = { 
-        role: 'ai', 
-        text: res.data.reply 
-      };
-
+      const aiMessage = { role: 'ai', text: res.data.reply };
       if (res.data.actionInstruction) {
-        aiMessage.pendingAction = {
-          ...res.data.actionInstruction,
-          status: 'waiting' 
-        };
+        aiMessage.pendingAction = { ...res.data.actionInstruction, status: 'waiting' };
       }
-
       setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', text: 'Error connecting to Indra.' }]);
@@ -184,8 +163,37 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-slate-900 text-white">
+    <div className="flex flex-col h-full w-full bg-slate-900 text-white relative">
       
+      {/* --- SMARTSPHERE MODAL --- */}
+      {isVaultOpen && (
+        <div className="absolute inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-600 rounded-xl w-full max-w-md p-5 flex flex-col gap-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-emerald-400 font-bold flex items-center gap-2">
+                <Database size={18}/> SmartSphere Vault
+              </h3>
+              <button onClick={() => setIsVaultOpen(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
+            </div>
+            <p className="text-sm text-gray-300">
+              Paste your custom data, website content, or business rules here. When the <b>SmartSphere</b> model is selected, Indra will use this knowledge to answer.
+            </p>
+            <textarea
+              value={vaultData}
+              onChange={(e) => setVaultData(e.target.value)}
+              className="w-full h-48 bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+              placeholder="e.g., 'Our return policy is 30 days. Shipping takes 2-4 days. Contact support@store.com...'"
+            />
+            <button 
+              onClick={() => setIsVaultOpen(false)} 
+              className="bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg font-bold text-sm transition-colors"
+            >
+              Save to Vault
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* HEADER CONTROLS */}
       <div className="p-3 bg-slate-800 border-b border-slate-700 flex flex-wrap gap-3 justify-between items-center z-20">
         <div className="relative group flex-1 min-w-[150px]">
@@ -226,7 +234,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
               {msg.role !== 'user' && !isCompact && <Bot className="text-purple-400 mt-1 shrink-0" size={20} />}
               <div className={`p-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600' : 'bg-slate-800 border border-slate-700'}`}>
                 {msg.image && <img src={msg.image} className="rounded-lg mb-2 max-h-48 object-cover" alt="attachment"/>}
-                <p className={isCompact ? 'text-sm' : 'text-base'}>{msg.text}</p>
+                <p className={isCompact ? 'text-sm whitespace-pre-wrap' : 'text-base whitespace-pre-wrap'}>{msg.text}</p>
               </div>
             </div>
 
