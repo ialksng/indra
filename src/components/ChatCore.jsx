@@ -327,14 +327,18 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       {/* --- CENTRAL THUNDERBOLT ACTION HUB --- */}
       <div className="action-hub-container">
         
-        {selectedImage && (
-          <div className="absolute -top-16 left-6 bg-[#0f172a] p-1.5 rounded-xl border border-white/10 shadow-2xl z-10 animate-in fade-in slide-in-from-bottom-2">
-            <div className="relative">
-              <img src={selectedImage} alt="Preview" className="h-12 w-12 object-cover rounded-lg" />
-              <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"><X size={12} /></button>
-            </div>
-          </div>
-        )}
+{selectedImage && (
+  <>
+    <div className="absolute -top-16 left-6 bg-[#0f172a] p-1.5 rounded-xl border border-white/10 shadow-2xl z-10 transition-all duration-300">
+      <div className="relative">
+        <img src={selectedImage} alt="Preview" className="h-12 w-12 object-cover rounded-lg" />
+        <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5">
+          <X size={12} />
+        </button>
+      </div>
+    </div>
+  </>
+)}
 
         <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
 
@@ -390,7 +394,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
 
             <button 
               onClick={() => setShowActionMenu(!showActionMenu)}
-              /* THE FIX: Replaced custom colored shadow with safe Tailwind utilities */
               className={`thunderbolt-main-btn ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-lg'}`}
             >
               {showActionMenu ? <X size={32} /> : <Zap size={32} fill="currentColor" />}
