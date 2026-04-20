@@ -43,7 +43,8 @@
   @apply flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all shadow-2xl placeholder:text-gray-600;
 }
 .send-btn {
-  @apply p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all;
+  /* FIX: Replaced custom RGBA shadow with safe amber-500/40 shadow */
+  @apply p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-lg shadow-amber-500/40 transition-all;
 }
 
 /* --- Message Bubbles --- */
@@ -58,8 +59,10 @@
 .action-hub-container {
   @apply p-6 bg-black/20 border-t border-white/10 flex flex-col items-center justify-center relative min-h-[100px];
 }
+
 .action-menu-popup {
-  @apply absolute bottom-24 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-2xl p-4 rounded-[40px] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.8)] w-[95%] max-w-[360px] animate-in fade-in zoom-in-95 duration-200;
+  /* FIX: Removed animate-in classes which crash the build without the external plugin */
+  @apply absolute bottom-24 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-2xl p-4 rounded-[40px] border border-white/10 shadow-2xl w-[95%] max-w-[360px] duration-200;
 }
 .action-icon-btn {
   @apply flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group;
