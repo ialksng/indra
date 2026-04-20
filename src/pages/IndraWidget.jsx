@@ -25,30 +25,27 @@ export default function IndraWidget() {
         {/* Subtle texture overlay for the header */}
         <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiMwMDAiLz48L3N2Zz4=')] mix-blend-overlay"></div>
 
-        {/* LOGO - Wrapped in a dark semi-transparent pill for guaranteed visibility */}
-        <div className="relative flex items-center gap-3 z-10 bg-black/40 pr-4 pl-1.5 py-1.5 rounded-full border border-white/10 shadow-sm backdrop-blur-md">
-          <div className="bg-white/10 p-1.5 rounded-full flex items-center justify-center">
-            <img 
-              src="/favicon.svg"
-              alt="Indra Logo"
-              className="w-6 h-6 object-contain drop-shadow-md"
-              onError={(e) => { e.target.style.display = 'none' }}
-            />
-          </div>
-          <span className="font-extrabold tracking-wide text-white text-sm">INDRA</span>
+        {/* LOGO - Text removed, size increased, centered in a dark circle */}
+        <div className="relative flex items-center justify-center z-10 bg-black/40 p-2 rounded-full border border-white/10 shadow-sm backdrop-blur-md">
+          <img 
+            src="/favicon.svg"
+            alt="Indra Logo"
+            className="w-9 h-9 object-contain drop-shadow-md"
+            onError={(e) => { e.target.style.display = 'none' }}
+          />
         </div>
 
-        {/* MAXIMIZE BUTTON */}
+        {/* MAXIMIZE BUTTON - Scaled up slightly to match the larger logo */}
         <button 
           onClick={openFullSite}
           className="relative z-10 group flex items-center justify-center 
-                     w-9 h-9 rounded-full 
+                     w-10 h-10 rounded-full 
                      bg-black/20 hover:bg-black/40 border border-transparent hover:border-white/20
                      transition-all duration-200 shadow-sm"
           title="Open full workspace"
         >
           <Maximize2 
-            size={16} 
+            size={18} 
             className="text-white group-hover:text-amber-300 group-hover:scale-110 transition-transform"
           />
         </button>
