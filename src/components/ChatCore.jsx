@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Bot } from 'lucide-react';
+import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Bot, MousePointerClick } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 export default function ChatCore({ projectId = 'default', isCompact = false }) {
@@ -8,6 +8,8 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [isLoading, setIsLoading] = useState(false);
   
   const [selectedModel, setSelectedModel] = useState('gemini-flash');
+  const [automationEnabled, setAutomationEnabled] = useState(false); 
+  
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null); 
@@ -23,8 +25,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   }, [messages]);
 
   const models = [
-    { id: 'gemini-flash', name: 'Gemini Flash (Fast)' },
-    { id: 'gemini-pro', name: 'Gemini Pro (Advanced)' },
+    { id: 'gemini-flash', name: 'Gemini 1.5 Flash' },
+    { id: 'gemini-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'groq-llama-3', name: 'Groq Llama-3 70B (Fast)' },
+    { id: 'groq-mixtral', name: 'Groq Mixtral' },
     { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
   ];
 
@@ -154,6 +158,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         message: textToSend,
         image: imageToSend,
         modelType: selectedModel,
+        allowAutomation: automationEnabled, 
         projectId,
         history: updatedMessages
       });
@@ -181,19 +186,38 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   return (
     <div className="flex flex-col h-full w-full bg-slate-900 text-white">
       
-      <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-20">
-        <div className="relative group">
+      {/* HEADER CONTROLS */}
+      <div className="p-3 bg-slate-800 border-b border-slate-700 flex flex-wrap gap-3 justify-between items-center z-20">
+        <div className="relative group flex-1 min-w-[150px]">
           <select 
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="appearance-none bg-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer text-sm font-medium"
+            className="w-full appearance-none bg-slate-700 text-white px-3 py-2 pr-10 rounded-lg border border-slate-600 focus:outline-none focus:border-purple-500 cursor-pointer text-sm font-medium"
           >
             {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <ChevronDown size={16} className="absolute right-3 top-3 pointer-events-none text-gray-400" />
+          <ChevronDown size={16} className="absolute right-3 top-2.5 pointer-events-none text-gray-400" />
         </div>
+
+        {/* AUTOMATION TOGGLE */}
+        <label className="flex items-center gap-2 cursor-pointer bg-slate-700 px-3 py-2 rounded-lg border border-slate-600 hover:bg-slate-600 transition-colors">
+          <input 
+            type="checkbox" 
+            checked={automationEnabled}
+            onChange={(e) => setAutomationEnabled(e.target.checked)}
+            className="hidden" 
+          />
+          <MousePointerClick size={16} className={automationEnabled ? "text-purple-400" : "text-gray-400"} />
+          <span className={`text-sm font-medium select-none ${automationEnabled ? "text-white" : "text-gray-400"}`}>
+            Web Agent
+          </span>
+          <div className={`w-8 h-4 ml-1 rounded-full relative transition-colors ${automationEnabled ? 'bg-purple-500' : 'bg-slate-900'}`}>
+            <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-transform ${automationEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+          </div>
+        </label>
       </div>
 
+      {/* CHAT HISTORY */}
       <div className={`flex-1 overflow-y-auto ${isCompact ? 'p-3 space-y-4' : 'p-6 space-y-6'}`}>
         {messages.map((msg, i) => (
           <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -242,6 +266,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* VIDEO PREVIEW */}
       <div className={`p-2 bg-slate-800 border-t border-slate-700 flex justify-center ${activeVideoSource ? 'flex' : 'hidden'}`}>
         <div className="relative rounded-lg overflow-hidden border-2 border-purple-500 max-w-full">
           <video 
@@ -263,6 +288,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
+      {/* INPUT AREA */}
       <div className="p-3 bg-slate-800/50 border-t border-slate-700 flex flex-col gap-2 relative">
         
         {selectedImage && (
