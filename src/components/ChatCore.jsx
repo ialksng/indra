@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, MousePointerClick, ShieldAlert } from 'lucide-react';
+import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, ShieldAlert } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 export default function ChatCore({ projectId = 'default', isCompact = false }) {
@@ -236,30 +236,30 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   };
 
   return (
-    <div id="indra-chat-core-container" className="flex flex-col h-full w-full text-white relative bg-transparent">
+    <div id="indra-chat-core-container" className="flex flex-col h-full w-full relative z-10">
       
       {/* SMARTSPHERE MODAL */}
       {isVaultOpen && (
-        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-slate-900 border border-amber-500/30 rounded-xl w-full max-w-md p-6 flex flex-col gap-4 shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-amber-500/20 rounded-xl w-full max-w-md p-5 flex flex-col gap-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="text-amber-400 font-bold flex items-center gap-2">
-                <Database size={18}/> SmartSphere Vault
+              <h3 className="text-amber-400 font-bold flex items-center gap-2 tracking-wide uppercase text-sm">
+                <Database size={16}/> SmartSphere Vault
               </h3>
-              <button onClick={() => setIsVaultOpen(false)} className="text-gray-400 hover:text-white transition-colors"><X size={20}/></button>
+              <button onClick={() => setIsVaultOpen(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
-            <p className="text-sm text-slate-300">
-              Paste custom data, website content, or business rules here. When the <b>SmartSphere</b> model is selected, Indra will use this knowledge to answer.
+            <p className="text-sm text-gray-400">
+              Paste your custom data, website content, or business rules here. When the <b>SmartSphere</b> model is selected, Indra will use this knowledge to answer.
             </p>
             <textarea
               value={vaultData}
               onChange={(e) => setVaultData(e.target.value)}
-              className="w-full h-48 bg-black/50 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none resize-none"
-              placeholder="e.g., 'Our return policy is 30 days. Contact support@store.com...'"
+              className="w-full h-48 bg-black/50 border border-white/10 rounded-lg p-3 text-sm text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none resize-none"
+              placeholder="e.g., 'Our return policy is 30 days. Shipping takes 2-4 days. Contact support@store.com...'"
             />
             <button 
               onClick={() => setIsVaultOpen(false)} 
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 py-2.5 rounded-lg font-bold text-sm transition-all"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black py-2.5 rounded-lg font-bold text-sm transition-colors shadow-lg"
             >
               Save to Vault
             </button>
@@ -268,37 +268,37 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       )}
 
       {/* HEADER CONTROLS */}
-      <div className="p-3 bg-slate-900/50 backdrop-blur-sm border-b border-white/5 flex flex-wrap gap-3 justify-between items-center z-20">
+      <div className="p-3 bg-black/20 border-b border-white/5 flex flex-wrap gap-3 justify-between items-center z-20 backdrop-blur-sm">
         <div className="relative group flex-1 min-w-[150px] max-w-[200px]">
           <select 
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full appearance-none bg-slate-800 text-slate-200 px-3 py-2 pr-10 rounded-lg border border-slate-700 focus:outline-none focus:border-amber-500 cursor-pointer text-sm font-medium truncate transition-colors hover:border-slate-600"
+            className="w-full appearance-none bg-white/5 text-white px-3 py-2 pr-10 rounded-lg border border-white/10 focus:outline-none focus:border-amber-500 cursor-pointer text-sm font-medium truncate"
           >
-            {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {models.map(m => <option className="bg-slate-900" key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <ChevronDown size={16} className="absolute right-3 top-2.5 pointer-events-none text-slate-400" />
+          <ChevronDown size={16} className="absolute right-3 top-2.5 pointer-events-none text-gray-400" />
         </div>
 
         {selectedModel.startsWith('groq') && (selectedImage || activeVideoSource) && (
-          <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-1 rounded">
+          <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-500/20">
             <ShieldAlert size={12} /> Llama 3 is text-only
           </div>
         )}
 
-        <label className="flex items-center gap-2 cursor-pointer bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors">
+        <label className="flex items-center gap-2 cursor-pointer bg-white/5 px-3 py-2 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
           <input 
             type="checkbox" 
             checked={automationEnabled}
             onChange={(e) => setAutomationEnabled(e.target.checked)}
             className="hidden" 
           />
-          <MousePointerClick size={16} className={automationEnabled ? "text-amber-400" : "text-slate-400"} />
-          <span className={`text-sm font-medium select-none hidden sm:block ${automationEnabled ? "text-slate-200" : "text-slate-400"}`}>
+          <MousePointerClick size={16} className={automationEnabled ? "text-amber-400" : "text-gray-400"} />
+          <span className={`text-sm font-medium select-none hidden sm:block ${automationEnabled ? "text-white" : "text-gray-400"}`}>
             Web Agent
           </span>
-          <div className={`w-8 h-4 ml-1 rounded-full relative transition-colors ${automationEnabled ? 'bg-amber-500' : 'bg-slate-950 border border-slate-700'}`}>
-            <div className={`absolute top-[1px] left-[1px] bg-white w-3 h-3 rounded-full transition-transform ${automationEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+          <div className={`w-8 h-4 ml-1 rounded-full relative transition-colors ${automationEnabled ? 'bg-amber-500' : 'bg-black/50 border border-white/10'}`}>
+            <div className={`absolute top-[1px] left-[1px] bg-white w-3.5 h-3.5 rounded-full transition-transform ${automationEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
           </div>
         </label>
       </div>
@@ -308,23 +308,15 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         
         {/* EMPTY STATE */}
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center p-6">
-            <div className="relative mb-6">
-              <img 
-                src="/favicon.svg" 
-                alt="Indra" 
-                className="w-20 h-20 relative z-10 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" 
-                onError={(e) => { e.target.style.display = 'none' }}
-              />
-              <div className="absolute inset-0 blur-2xl opacity-40 rounded-full scale-150 bg-amber-500"></div>
+          <div className="flex flex-col items-center justify-center h-full text-center p-6 mt-10">
+            <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center mb-4">
+              <Zap className="text-amber-500" size={24} />
             </div>
-            <p className="text-slate-400 text-sm mb-6 max-w-xs leading-relaxed">
-              I can help you automate this page or answer questions securely from your vault.
-            </p>
+            <p className="text-slate-400 text-sm mb-4 max-w-xs">Ready to automate this page or answer questions from your SmartSphere vault.</p>
             {isCompact && (
               <button 
                 onClick={() => window.open('https://indra.ialksng.me', '_blank', 'noopener,noreferrer')}
-                className="text-xs font-bold text-amber-500 hover:text-amber-400 uppercase tracking-widest transition-colors bg-amber-500/10 px-4 py-2 rounded-full border border-amber-500/20 hover:bg-amber-500/20"
+                className="text-xs font-bold text-amber-500 hover:text-amber-400 uppercase tracking-widest transition-colors"
               >
                 Launch Full Workspace
               </button>
@@ -336,79 +328,62 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} max-w-[90%]`}>
               
-              {/* Message Avatar */}
-              {msg.role !== 'user' && !isCompact && (
-                <div className="w-8 h-8 mt-1 shrink-0 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700">
-                  <img 
-                    src="/favicon.svg" 
-                    alt="Indra" 
-                    className="w-5 h-5 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" 
-                    onError={(e) => { e.target.style.display = 'none' }}
-                  />
-                </div>
-              )}
-              
-              <div className={`p-3.5 rounded-2xl ${msg.role === 'user' ? 'bg-amber-500 text-slate-950 font-medium shadow-[0_4px_15px_rgba(245,158,11,0.2)]' : 'bg-slate-800 border border-slate-700 text-slate-200'}`}>
-                {msg.image && <img src={msg.image} className="rounded-lg mb-3 max-h-48 object-cover border border-slate-700/50" alt="attachment"/>}
-                <p className={isCompact ? 'text-sm whitespace-pre-wrap' : 'text-base whitespace-pre-wrap leading-relaxed'}>{msg.text}</p>
+              <div className={`p-3.5 rounded-2xl ${msg.role === 'user' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-black font-medium shadow-lg' : 'bg-white/5 border border-white/10 text-slate-200'}`}>
+                {msg.image && <img src={msg.image} className="rounded-lg mb-2 max-h-48 object-cover" alt="attachment"/>}
+                <p className={isCompact ? 'text-sm whitespace-pre-wrap' : 'text-base whitespace-pre-wrap'}>{msg.text}</p>
               </div>
             </div>
 
             {msg.pendingAction && (
-              <div className={`ml-11 mt-1 p-4 bg-slate-800/80 border border-amber-500/30 rounded-xl max-w-[85%] flex flex-col gap-3 shadow-lg backdrop-blur-sm ${isCompact ? 'ml-0 max-w-full' : ''}`}>
-                <div className="flex items-center gap-2 text-amber-400 text-sm font-bold">
-                  <img src="/favicon.svg" className="w-4 h-4" alt="Icon"/> Indra requests permission to:
+              <div className="ml-2 mt-1 p-3 bg-black/40 border border-amber-500/30 rounded-xl max-w-[85%] flex flex-col gap-2 backdrop-blur-md">
+                <div className="flex items-center gap-2 text-amber-400 text-sm font-bold uppercase tracking-wide">
+                  <Zap size={14} /> Action Requested
                 </div>
-                <div className="bg-black/50 p-2.5 rounded-lg text-xs font-mono text-slate-300 border border-slate-700">
-                  <span className="text-amber-500 font-bold">{msg.pendingAction.action.toUpperCase()}</span> on element <span className="text-blue-400">"{msg.pendingAction.selector}"</span>
+                <div className="bg-black/60 p-2 rounded text-xs font-mono text-gray-300 border border-white/5">
+                  <span className="text-orange-400">{msg.pendingAction.action.toUpperCase()}</span> on element <span className="text-emerald-400">"{msg.pendingAction.selector}"</span>
                 </div>
                 
                 {msg.pendingAction.status === 'waiting' && (
                   <div className="flex gap-2 mt-1">
                     <button 
                       onClick={() => approveAction(msg.pendingAction, i)}
-                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold py-2.5 rounded-lg transition-all shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold py-2 rounded transition-colors"
                     >
                       Approve
                     </button>
                     <button 
                       onClick={() => denyAction(i)}
-                      className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-2.5 rounded-lg transition-colors"
+                      className="flex-1 bg-white/10 hover:bg-white/20 text-white text-xs font-bold py-2 rounded transition-colors"
                     >
                       Deny
                     </button>
                   </div>
                 )}
-                {msg.pendingAction.status === 'approved' && <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">✓ Action Executed</span>}
-                {msg.pendingAction.status === 'denied' && <span className="text-xs text-red-400 font-bold flex items-center gap-1">✗ Action Denied</span>}
+                {msg.pendingAction.status === 'approved' && <span className="text-xs text-emerald-500 font-bold">✓ Action Executed</span>}
+                {msg.pendingAction.status === 'denied' && <span className="text-xs text-red-400 font-bold">✗ Action Denied</span>}
               </div>
             )}
           </div>
         ))}
-        {isLoading && (
-           <div className="flex items-center gap-2 m-4 text-amber-500">
-             <Loader2 className="animate-spin" size={20} />
-             <span className="text-sm font-medium animate-pulse">Indra is thinking...</span>
-           </div>
-        )}
+        {isLoading && <Loader2 className="animate-spin text-amber-500 m-4" size={20} />}
         <div ref={messagesEndRef} />
       </div>
 
       {/* VIDEO PREVIEW */}
-      <div className={`p-3 bg-slate-900/80 backdrop-blur-md border-t border-white/5 flex justify-center ${activeVideoSource ? 'flex' : 'hidden'}`}>
-        <div className="relative rounded-xl overflow-hidden border border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.2)] max-w-full">
+      <div className={`p-2 bg-black/40 border-t border-white/10 flex justify-center backdrop-blur-md ${activeVideoSource ? 'flex' : 'hidden'}`}>
+        <div className="relative rounded-lg overflow-hidden border border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)] max-w-full">
           <video 
             ref={videoRef} 
             className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'transform scale-x-[-1]' : ''}`} 
             muted 
             playsInline 
           />
-          <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse shadow-lg">
+          <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse font-bold tracking-wide">
             {activeVideoSource === 'screen' ? 'SHARING SCREEN' : 'LIVE'}
           </span>
           <button 
             onClick={stopVideo}
-            className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-red-500 transition-colors backdrop-blur-sm"
+            className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-red-500 transition-colors"
           >
             <X size={14} />
           </button>
@@ -417,65 +392,59 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       </div>
 
       {/* INPUT AREA */}
-      <div className="p-3 bg-slate-900/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 relative">
+      <div className="p-3 bg-black/20 border-t border-white/10 flex flex-col gap-2 relative backdrop-blur-md">
         
         {selectedImage && (
-          <div className="absolute -top-24 left-4 bg-slate-800 p-2 rounded-xl border border-slate-700 shadow-xl z-10">
+          <div className="absolute -top-20 left-2 bg-[#0f172a] p-2 rounded-lg border border-white/10 shadow-xl z-10">
             <div className="relative">
-              <img src={selectedImage} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-slate-600" />
+              <img src={selectedImage} alt="Preview" className="h-16 w-16 object-cover rounded border border-white/5" />
               <button 
                 onClick={() => setSelectedImage(null)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform"
+                className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 hover:scale-110 transition-transform shadow-lg"
               >
-                <X size={12} />
+                <X size={14} />
               </button>
             </div>
           </div>
         )}
 
         {showUploadMenu && (
-          <div className="absolute bottom-[70px] left-3 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 flex flex-col gap-1 z-50 min-w-[200px]">
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 rounded-lg text-sm w-full text-slate-200 transition-colors">
-              <HardDrive size={16} className="text-blue-400" /> Device Upload
+          <div className="absolute bottom-16 left-2 bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl p-2 flex flex-col gap-1 z-50">
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-md text-sm w-full transition-colors">
+              <HardDrive size={16} className="text-amber-400" /> Device Upload
             </button>
-            <button onClick={handleSmartSphereUpload} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 rounded-lg text-sm w-full text-slate-200 transition-colors">
-              <Database size={16} className="text-amber-400" /> SmartSphere Vault
+            <button onClick={handleSmartSphereUpload} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-md text-sm w-full transition-colors">
+              <Database size={16} className="text-orange-400" /> SmartSphere Vault
             </button>
           </div>
         )}
 
-        <div className="flex items-end gap-2">
+        <div className="flex items-center gap-1">
           <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
           
-          <div className="flex bg-slate-800 rounded-xl border border-slate-700 p-1 h-11 items-center">
-            <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-700/50 rounded-lg transition-colors" title="Attach">
-              <ImagePlus size={18} />
-            </button>
-            <div className="w-[1px] h-4 bg-slate-700 mx-1"></div>
-            <button onClick={toggleCamera} className={`p-2 rounded-lg transition-colors ${activeVideoSource === 'camera' ? 'bg-amber-500/20 text-amber-500' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-700/50'}`} title="Camera">
-              <Camera size={18} />
-            </button>
-            <button onClick={toggleScreenShare} className={`p-2 rounded-lg transition-colors ${activeVideoSource === 'screen' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400 hover:text-blue-400 hover:bg-slate-700/50'}`} title="Screen Share">
-              <MonitorUp size={18} />
-            </button>
-          </div>
+          <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-gray-400 hover:text-amber-400 transition-colors" title="Attach">
+            <ImagePlus size={20} />
+          </button>
 
-          <div className="flex-1 bg-slate-800 border border-slate-700 rounded-xl flex items-center pr-1.5 overflow-hidden focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/50 transition-all">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={activeVideoSource ? "Ask about what I'm seeing..." : "Type a message..."}
-              className="flex-1 bg-transparent border-none px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-0"
-            />
-            <button 
-              onClick={handleSend} 
-              disabled={isLoading || (!input.trim() && !activeVideoSource && !selectedImage)} 
-              className="p-2 bg-amber-500 hover:bg-amber-400 rounded-lg disabled:opacity-30 disabled:hover:bg-amber-500 text-slate-950 transition-colors my-1 shrink-0"
-            >
-              <Send size={16} className={isLoading || (!input.trim() && !activeVideoSource && !selectedImage) ? 'opacity-50' : ''} />
-            </button>
-          </div>
+          <button onClick={toggleCamera} className={`p-2 rounded-full transition-colors ${activeVideoSource === 'camera' ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-amber-400'}`} title="Camera">
+            <Camera size={20} />
+          </button>
+
+          <button onClick={toggleScreenShare} className={`p-2 rounded-full transition-colors ${activeVideoSource === 'screen' ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-amber-400'}`} title="Screen Share">
+            <MonitorUp size={20} />
+          </button>
+
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            placeholder={activeVideoSource ? "Ask about what I'm seeing..." : "Type a message..."}
+            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 ml-1 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all placeholder:text-gray-500"
+          />
+          
+          <button onClick={handleSend} disabled={isLoading || (!input.trim() && !activeVideoSource && !selectedImage)} className="p-2.5 ml-1 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl disabled:opacity-50 text-black shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all">
+            <Send size={18} className="ml-0.5" />
+          </button>
         </div>
       </div>
     </div>

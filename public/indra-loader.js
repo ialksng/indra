@@ -28,20 +28,20 @@
     #indra-iframe.visible { display: block; opacity: 1; transform: translateY(0); }
     #indra-toggle-btn { 
       width: 60px; height: 60px; border-radius: 30px; 
-      background: linear-gradient(135deg, #9333ea, #6366f1); color: white; 
-      border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4); 
+      background: linear-gradient(135deg, #FACC15, #F97316); color: #000; 
+      border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); 
       display: flex; justify-content: center; align-items: center; 
       transition: transform 0.2s, box-shadow 0.2s; 
     }
-    #indra-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(147, 51, 234, 0.6); }
+    #indra-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6); }
     #indra-toggle-btn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
     
     @keyframes indraAgentPulse {
-      0% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.7); outline: 2px solid #9333ea; }
-      70% { box-shadow: 0 0 0 10px rgba(147, 51, 234, 0); outline: 2px solid rgba(147, 51, 234, 0.5); }
-      100% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0); outline: transparent; }
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); outline: 2px solid #FACC15; }
+      70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); outline: 2px solid rgba(245, 158, 11, 0.5); }
+      100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); outline: transparent; }
     }
-    .indra-highlight { animation: indraAgentPulse 1s ease-out forwards; }
+    .indra-highlight { animation: indraAgentPulse 1s ease-out forwards; border-radius: inherit; }
     @media (max-width: 480px) { #indra-iframe { width: calc(100vw - 40px); } }
   `;
 
