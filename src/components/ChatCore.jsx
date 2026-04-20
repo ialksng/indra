@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, ShieldAlert, Mic, Volume2, VolumeX, Download, Cloud } from 'lucide-react';
+import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, ShieldAlert, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 export default function ChatCore({ projectId = 'default', isCompact = false }) {
@@ -11,7 +11,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [automationEnabled, setAutomationEnabled] = useState(false); 
   const [voiceEnabled, setVoiceEnabled] = useState(false); 
   
-  const [showUploadMenu, setShowUploadMenu] = useState(false);
+  // --- NEW UI STATES ---
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [showTextInput, setShowTextInput] = useState(false);
+
   const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null); 
 
@@ -49,26 +52,18 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   }, []);
 
-  // 🔥 THE ULTIMATE MODELS LIST (All APIs Included)
   const models = [
-    // Google API
     { id: 'flash', name: '⚡ Gemini 2.5 Flash' },
     { id: 'flash-lite', name: '🍃 Gemini 2.5 Flash Lite' },
     { id: 'pro', name: '🧠 Gemini 2.5 Pro (Complex)' },
     { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
-    
-    // Groq API
     { id: 'deepseek', name: '🤔 DeepSeek R1 (Math/Logic)' },
     { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
     { id: 'groq-vision', name: '👁️ Llama Vision (Image Reader)' },
-    
-    // OpenRouter API
     { id: 'or-mistral', name: '🌪️ Mistral 7B' },
     { id: 'or-gemma', name: '💎 Google Gemma 9B' },
     { id: 'or-phi', name: '🔬 Microsoft Phi-3' },
     { id: 'or-qwen', name: '🐉 Alibaba Qwen 7B' },
-
-    // Free Utilities
     { id: 'image-generator', name: '🎨 Image Generator' },
     { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
   ];
@@ -147,7 +142,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     if (lastIndex < text.length) {
       parts.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex)}</span>);
     }
-    
     return parts.length > 0 ? parts : text;
   };
 
@@ -206,14 +200,14 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     const reader = new FileReader();
     reader.onloadend = () => {
       setSelectedImage(reader.result);
-      setShowUploadMenu(false);
+      setShowActionMenu(false);
     };
     reader.readAsDataURL(file);
   };
 
   const handleSmartSphereUpload = () => {
     setIsVaultOpen(true);
-    setShowUploadMenu(false);
+    setShowActionMenu(false);
   };
 
   const approveAction = (actionDetails, messageIndex) => {
@@ -273,6 +267,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     
     setInput('');
     setSelectedImage(null);
+    setShowTextInput(false); // Hide text input upon sending
 
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -313,6 +308,9 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   };
 
+  // Condition to check if we should render the Text Input area instead of the Action Hub
+  const isInputModeActive = showTextInput || isRecording || activeVideoSource || selectedImage;
+
   return (
     <div id="indra-chat-core-container" className="flex flex-col h-full w-full relative z-10">
       
@@ -321,21 +319,15 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-[#0f172a] border border-amber-500/20 rounded-xl w-full max-w-sm p-5 flex flex-col gap-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="text-amber-400 font-bold">Save Image Options</h3>
+              <h3 className="text-amber-400 font-bold">Save Image</h3>
               <button onClick={() => setShowSaveDialog(null)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
             <img src={showSaveDialog} className="rounded-lg max-h-48 object-contain bg-black/50" alt="Preview" />
             <div className="flex flex-col gap-2">
-              <button 
-                onClick={() => downloadToDevice(showSaveDialog)} 
-                className="flex items-center justify-center gap-2 bg-amber-500 text-black py-2.5 rounded-lg font-bold hover:bg-amber-400 transition-colors"
-              >
+              <button onClick={() => downloadToDevice(showSaveDialog)} className="flex items-center justify-center gap-2 bg-amber-500 text-black py-2.5 rounded-lg font-bold hover:bg-amber-400 transition-colors">
                 <Download size={18} /> Download to Device
               </button>
-              <button 
-                onClick={() => saveToSmartSphere(showSaveDialog)} 
-                className="flex items-center justify-center gap-2 bg-white/10 text-white py-2.5 rounded-lg font-bold hover:bg-white/20 transition-colors border border-white/5"
-              >
+              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="flex items-center justify-center gap-2 bg-white/10 text-white py-2.5 rounded-lg font-bold hover:bg-white/20 transition-colors border border-white/5">
                 <Cloud size={18} /> Save to SmartSphere
               </button>
             </div>
@@ -388,7 +380,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           <span className="text-xs font-bold hidden sm:block">{voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
         </button>
 
-        {/* 🔥 UPDATED SAFETY CHECK: Warns if model is text-only (DeepSeek, Groq Llama, OpenRouter) */}
         {(selectedModel === 'groq-llama-3' || selectedModel === 'deepseek' || selectedModel.startsWith('or-')) && (selectedImage || activeVideoSource) && (
           <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-500/20">
             <ShieldAlert size={12} /> Model is text-only
@@ -409,10 +400,11 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       <div className={`flex-1 overflow-y-auto ${isCompact ? 'p-3 space-y-4' : 'p-6 space-y-6'}`}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 mt-10">
-            <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center mb-4">
-              <Zap className="text-amber-500" size={24} />
+            <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-6">
+              <Zap className="text-amber-500" size={32} />
             </div>
-            <p className="text-slate-400 text-sm mb-4 max-w-xs">Ready to talk, generate images, or automate this page.</p>
+            <h3 className="text-white font-bold text-lg mb-2">Hello, I am Indra.</h3>
+            <p className="text-slate-400 text-sm max-w-xs">Click the thunderbolt below to search the web, generate images, or automate your tasks.</p>
           </div>
         )}
 
@@ -456,16 +448,20 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       <div className={`p-2 bg-black/40 border-t border-white/10 flex justify-center backdrop-blur-md ${activeVideoSource ? 'flex' : 'hidden'}`}>
         <div className="relative rounded-lg overflow-hidden border border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)] max-w-full">
           <video ref={videoRef} className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'transform scale-x-[-1]' : ''}`} muted playsInline />
+          <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse font-bold tracking-wide">
+            {activeVideoSource === 'screen' ? 'SHARING SCREEN' : 'LIVE'}
+          </span>
           <button onClick={stopVideo} className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-red-500"><X size={14} /></button>
         </div>
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* INPUT AREA */}
-      <div className="p-3 bg-black/20 border-t border-white/10 flex flex-col gap-2 relative backdrop-blur-md">
+      {/* --- NEW CENTRAL HUB BOTTOM AREA --- */}
+      <div className="p-4 bg-black/20 border-t border-white/10 flex items-center justify-center relative backdrop-blur-md min-h-[90px]">
         
+        {/* Floating Image Preview above the hub */}
         {selectedImage && (
-          <div className="absolute -top-20 left-2 bg-[#0f172a] p-2 rounded-lg border border-white/10 shadow-xl z-10">
+          <div className="absolute -top-20 left-4 bg-[#0f172a] p-2 rounded-lg border border-white/10 shadow-xl z-10">
             <div className="relative">
               <img src={selectedImage} alt="Preview" className="h-16 w-16 object-cover rounded border border-white/5" />
               <button onClick={() => setSelectedImage(null)} className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1"><X size={14} /></button>
@@ -473,40 +469,89 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           </div>
         )}
 
-        {showUploadMenu && (
-          <div className="absolute bottom-16 left-2 bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl p-2 flex flex-col gap-1 z-50">
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-md text-sm w-full"><HardDrive size={16} className="text-amber-400" /> Device Upload</button>
-            <button onClick={handleSmartSphereUpload} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 rounded-md text-sm w-full"><Database size={16} className="text-orange-400" /> SmartSphere Vault</button>
+        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
+
+        {isInputModeActive ? (
+          // ACTIVE INPUT MODE (When typing, recording, or media attached)
+          <div className="flex items-center gap-2 w-full max-w-3xl transition-all">
+            <button 
+              onClick={() => {
+                setShowTextInput(false);
+                if (isRecording) toggleRecording();
+              }} 
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder={isRecording ? "Listening to your voice..." : activeVideoSource ? "Ask about what I'm seeing..." : "Type your message..."}
+              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all placeholder:text-gray-500 shadow-inner"
+              autoFocus
+            />
+            
+            <button 
+              onClick={handleSend} 
+              disabled={isLoading || (!input.trim() && !activeVideoSource && !selectedImage)} 
+              className="p-3.5 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-2xl disabled:opacity-50 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all"
+            >
+              <Send size={20} className="ml-0.5" />
+            </button>
+          </div>
+        ) : (
+          // THUNDERBOLT HUB MODE
+          <div className="flex justify-center items-center w-full relative">
+            
+            {/* The Expanded Action Menu */}
+            {showActionMenu && (
+              <div className="absolute bottom-20 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-xl p-4 rounded-3xl border border-white/10 shadow-2xl w-[95%] max-w-[340px]">
+                
+                <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-3 w-[90px] hover:bg-white/10 rounded-2xl text-gray-300 hover:text-amber-400 transition-all">
+                  <Search size={24} />
+                  <span className="text-[10px] font-bold tracking-widest">SEARCH</span>
+                </button>
+
+                <button onClick={() => { toggleRecording(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-3 w-[90px] hover:bg-white/10 rounded-2xl text-gray-300 hover:text-amber-400 transition-all">
+                  <Mic size={24} />
+                  <span className="text-[10px] font-bold tracking-widest">VOICE</span>
+                </button>
+
+                <button onClick={() => { toggleCamera(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-3 w-[90px] hover:bg-white/10 rounded-2xl text-gray-300 hover:text-amber-400 transition-all">
+                  <Camera size={24} />
+                  <span className="text-[10px] font-bold tracking-widest">CAMERA</span>
+                </button>
+
+                <button onClick={() => { toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-3 w-[90px] hover:bg-white/10 rounded-2xl text-gray-300 hover:text-amber-400 transition-all">
+                  <MonitorUp size={24} />
+                  <span className="text-[10px] font-bold tracking-widest">PRESENT</span>
+                </button>
+
+                <button onClick={() => { fileInputRef.current?.click(); }} className="flex flex-col items-center justify-center gap-2 p-3 w-[90px] hover:bg-white/10 rounded-2xl text-gray-300 hover:text-amber-400 transition-all">
+                  <HardDrive size={24} />
+                  <span className="text-[10px] font-bold tracking-widest">DEVICE</span>
+                </button>
+
+                <button onClick={() => handleSmartSphereUpload()} className="flex flex-col items-center justify-center gap-2 p-3 w-[90px] hover:bg-white/10 rounded-2xl text-gray-300 hover:text-amber-400 transition-all">
+                  <Database size={24} />
+                  <span className="text-[10px] font-bold tracking-widest">VAULT</span>
+                </button>
+
+              </div>
+            )}
+
+            {/* The Thunderbolt Button */}
+            <button 
+              onClick={() => setShowActionMenu(!showActionMenu)}
+              className={`w-16 h-16 rounded-full flex items-center justify-center text-black shadow-[0_0_30px_rgba(245,158,11,0.4)] transition-all duration-300 z-20 
+              ${showActionMenu ? 'bg-white/20 rotate-45 text-white shadow-none scale-90' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 hover:shadow-[0_0_50px_rgba(245,158,11,0.6)]'}`}
+            >
+              {showActionMenu ? <X size={28} /> : <Zap size={28} fill="currentColor" />}
+            </button>
           </div>
         )}
-
-        <div className="flex items-center gap-1">
-          <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
-          
-          <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-2 text-gray-400 hover:text-amber-400 transition-colors" title="Attach">
-            <ImagePlus size={20} />
-          </button>
-
-          <button onClick={toggleCamera} className={`p-2 rounded-full transition-colors ${activeVideoSource === 'camera' ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-amber-400'}`} title="Camera">
-            <Camera size={20} />
-          </button>
-
-          <button onClick={toggleRecording} className={`p-2 rounded-full transition-colors ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:text-amber-400'}`} title="Hold to Talk">
-            <Mic size={20} />
-          </button>
-
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={isRecording ? "Listening..." : activeVideoSource ? "Ask about what I'm seeing..." : "Type or speak..."}
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 ml-1 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all placeholder:text-gray-500"
-          />
-          
-          <button onClick={handleSend} disabled={isLoading || (!input.trim() && !activeVideoSource && !selectedImage)} className="p-2.5 ml-1 bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl disabled:opacity-50 text-black shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all">
-            <Send size={18} className="ml-0.5" />
-          </button>
-        </div>
       </div>
     </div>
   );
