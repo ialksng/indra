@@ -23,18 +23,20 @@ export default function IndraWidget() {
         }}
       >
 
-        {/* LOGO */}
+        {/* LOGO - Made wider/bigger and added contrast filter */}
         <div className="relative flex items-center">
           <img 
             src="/favicon.svg"
             alt="Indra Logo"
-            className="w-7 h-7 relative z-10"
+            // Increased width to w-10 and height to h-10. 
+            // Added brightness(0) drop-shadow to make it black/dark for contrast against yellow.
+            className="w-10 h-10 relative z-10 filter brightness-0 drop-shadow-md"
             onError={(e) => { e.target.style.display = 'none' }}
           />
 
-          {/* Glow (yellow energy style) */}
+          {/* Glow (kept but subdued slightly since logo is now dark) */}
           <div 
-            className="absolute inset-0 blur-lg opacity-70 rounded-full scale-125"
+            className="absolute inset-0 blur-lg opacity-50 rounded-full scale-125"
             style={{ backgroundColor: "#FACC15" }}
           ></div>
         </div>
@@ -43,13 +45,13 @@ export default function IndraWidget() {
         <button 
           onClick={openFullSite}
           className="group flex items-center justify-center 
-                     w-8 h-8 rounded-lg 
+                     w-9 h-9 rounded-lg 
                      bg-black/20 hover:bg-black/30 
                      transition-all duration-200"
           title="Open full experience"
         >
           <Maximize2 
-            size={16} 
+            size={18} 
             className="text-white group-hover:text-yellow-200"
           />
         </button>
