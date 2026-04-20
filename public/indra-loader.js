@@ -12,6 +12,15 @@
     #indra-toggle-btn { width: 60px; height: 60px; border-radius: 30px; background: linear-gradient(135deg, #9333ea, #6366f1); color: white; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4); display: flex; justify-content: center; align-items: center; transition: transform 0.2s, box-shadow 0.2s; }
     #indra-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(147, 51, 234, 0.6); }
     #indra-toggle-btn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
+    
+    /* NEW: Visual feedback animation for AI actions */
+    @keyframes indraAgentPulse {
+      0% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.7); outline: 2px solid #9333ea; }
+      70% { box-shadow: 0 0 0 10px rgba(147, 51, 234, 0); outline: 2px solid rgba(147, 51, 234, 0.5); }
+      100% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0); outline: transparent; }
+    }
+    .indra-agent-highlight { animation: indraAgentPulse 1s ease-out forwards; border-radius: inherit; }
+
     @media (max-width: 480px) { #indra-iframe { width: calc(100vw - 40px); } }
   `;
   document.head.appendChild(style);
@@ -43,12 +52,18 @@
   container.appendChild(button);
   document.body.appendChild(container);
 
+  // --- Helper to show visual feedback ---
+  const highlightElement = (el) => {
+    el.classList.add('indra-agent-highlight');
+    setTimeout(() => el.classList.remove('indra-agent-highlight'), 1000);
+  };
+
   window.addEventListener('message', (event) => {
-    if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost')) return; 
+    if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return; 
 
     const data = event.data;
 
-    // --- NEW: Handle Request for DOM Map ---
+    // --- Handle Request for DOM Map ---
     if (data && data.type === 'REQUEST_DOM_MAP') {
         const elements = document.querySelectorAll('a, button, input, select, textarea, [role="button"]');
         const map = [];
@@ -73,7 +88,7 @@
                 map.push({
                     type: el.tagName.toLowerCase(),
                     text: textContent,
-                    selector: `[data-indra-id="${indraId}"]` // The exact selector the AI should use
+                    selector: `[data-indra-id="${indraId}"]` 
                 });
             }
         });
@@ -82,6 +97,7 @@
         iframe.contentWindow.postMessage({ type: 'DOM_MAP_RESPONSE', payload: map }, '*');
     }
 
+    // --- Handle Execution of Actions ---
     if (data && data.type === 'INDRA_ACTION') {
       const { action, selector, value } = data.payload;
       console.log(`[Indra Agent] Executing: ${action} on ${selector}`);
@@ -93,6 +109,9 @@
           console.warn(`[Indra Agent] Element not found: ${selector}`);
           return;
         }
+
+        // Apply visual feedback
+        highlightElement(element);
 
         switch (action) {
           case 'click':
