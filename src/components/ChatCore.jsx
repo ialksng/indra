@@ -9,7 +9,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   
   const [selectedModel, setSelectedModel] = useState('flash');
   const [automationEnabled, setAutomationEnabled] = useState(false); 
-  const [voiceEnabled, setVoiceEnabled] = useState(false); // AI Voice Toggle
+  const [voiceEnabled, setVoiceEnabled] = useState(false); 
   
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [activeVideoSource, setActiveVideoSource] = useState(null);
@@ -17,7 +17,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
 
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultData, setVaultData] = useState('');
-  const [showSaveDialog, setShowSaveDialog] = useState(null); // Holds Image URL for saving
+  const [showSaveDialog, setShowSaveDialog] = useState(null); 
   
   const [isRecording, setIsRecording] = useState(false);
   
@@ -27,12 +27,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const canvasRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Setup Web Speech API for Mic Input
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -51,19 +49,30 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   }, []);
 
+  // 🔥 THE ULTIMATE MODELS LIST (All APIs Included)
   const models = [
-    { id: 'flash', name: '⚡ Gemini Flash (Fast)' },
-    { id: 'pro', name: '🧠 Gemini Pro (Complex)' },
+    // Google API
+    { id: 'flash', name: '⚡ Gemini 2.5 Flash' },
+    { id: 'flash-lite', name: '🍃 Gemini 2.5 Flash Lite' },
+    { id: 'pro', name: '🧠 Gemini 2.5 Pro (Complex)' },
     { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
-    { id: 'deepseek', name: '🤔 DeepSeek R1 (Logic/Math)' },
+    
+    // Groq API
+    { id: 'deepseek', name: '🤔 DeepSeek R1 (Math/Logic)' },
     { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
     { id: 'groq-vision', name: '👁️ Llama Vision (Image Reader)' },
+    
+    // OpenRouter API
+    { id: 'or-mistral', name: '🌪️ Mistral 7B' },
+    { id: 'or-gemma', name: '💎 Google Gemma 9B' },
+    { id: 'or-phi', name: '🔬 Microsoft Phi-3' },
+    { id: 'or-qwen', name: '🐉 Alibaba Qwen 7B' },
+
+    // Free Utilities
     { id: 'image-generator', name: '🎨 Image Generator' },
     { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
   ];
 
-  // --- NEW MEDIA & VOICE FUNCTIONS ---
-  
   const toggleRecording = () => {
     if (!recognitionRef.current) return alert("Your browser doesn't support speech recognition.");
     if (isRecording) {
@@ -77,11 +86,8 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
 
   const speakText = (text) => {
     if (!voiceEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // Stop current speech
-    
-    // Clean text: Remove markdown image URLs so AI doesn't read the raw link out loud
+    window.speechSynthesis.cancel(); 
     const cleanText = text.replace(/!\[.*?\]\((.*?)\)/g, 'Here is the image you requested.');
-    
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = 1.05;
     window.speechSynthesis.speak(utterance);
@@ -101,7 +107,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       window.URL.revokeObjectURL(blobUrl);
       setShowSaveDialog(null);
     } catch (e) {
-      window.open(url, '_blank'); // Fallback if CORS blocks it
+      window.open(url, '_blank'); 
       setShowSaveDialog(null);
     }
   };
@@ -112,7 +118,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setShowSaveDialog(null);
   };
 
-  // Parses markdown images out of text and renders them nicely
   const renderMessageText = (text) => {
     const imgRegex = /!\[.*?\]\((.*?)\)/g;
     const parts = [];
@@ -145,8 +150,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     
     return parts.length > 0 ? parts : text;
   };
-
-  // --- EXISTING FUNCTIONS ---
 
   const stopVideo = () => { 
     if (videoRef.current && videoRef.current.srcObject) {
@@ -300,7 +303,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       }
       setMessages(prev => [...prev, aiMessage]);
       
-      // AI Speaks the reply out loud
       speakText(replyText);
 
     } catch (err) {
@@ -374,11 +376,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           <ChevronDown size={16} className="absolute right-3 top-2.5 pointer-events-none text-gray-400" />
         </div>
 
-        {/* AI Voice Toggle */}
         <button 
           onClick={() => {
             setVoiceEnabled(!voiceEnabled);
-            if (voiceEnabled) window.speechSynthesis?.cancel(); // stop current if disabling
+            if (voiceEnabled) window.speechSynthesis?.cancel(); 
           }}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${voiceEnabled ? 'bg-amber-500/10 border-amber-500/50 text-amber-400' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'}`}
           title="AI Voice Output"
@@ -387,7 +388,8 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           <span className="text-xs font-bold hidden sm:block">{voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
         </button>
 
-        {(selectedModel === 'groq-llama-3' || selectedModel === 'deepseek') && (selectedImage || activeVideoSource) && (
+        {/* 🔥 UPDATED SAFETY CHECK: Warns if model is text-only (DeepSeek, Groq Llama, OpenRouter) */}
+        {(selectedModel === 'groq-llama-3' || selectedModel === 'deepseek' || selectedModel.startsWith('or-')) && (selectedImage || activeVideoSource) && (
           <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-500/20">
             <ShieldAlert size={12} /> Model is text-only
           </div>
@@ -421,7 +423,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
               <div className={`p-3.5 rounded-2xl ${msg.role === 'user' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-black font-medium shadow-lg' : 'bg-white/5 border border-white/10 text-slate-200'}`}>
                 {msg.image && <img src={msg.image} className="rounded-lg mb-2 max-h-48 object-cover" alt="attachment"/>}
                 <div className={isCompact ? 'text-sm whitespace-pre-wrap' : 'text-base whitespace-pre-wrap'}>
-                   {/* Renders text and replaces markdown images with actual image elements */}
                    {renderMessageText(msg.text)}
                 </div>
               </div>
@@ -490,7 +491,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
             <Camera size={20} />
           </button>
 
-          {/* Voice Input Button */}
           <button onClick={toggleRecording} className={`p-2 rounded-full transition-colors ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:text-amber-400'}`} title="Hold to Talk">
             <Mic size={20} />
           </button>
