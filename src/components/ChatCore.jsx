@@ -72,24 +72,148 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
 
   // --- VOICE & IMAGE UTILS ---
 
-  const toggleRecording = () => {
-    if (!recognitionRef.current) return alert("Your browser doesn't support speech recognition.");
-    if (isRecording) {
-      recognitionRef.current.stop();
-    } else {
-      recognitionRef.current.start();
-      setIsRecording(true);
-    }
-  };
+// --- IMPROVED VOICE & MIC LOGIC ---
 
-  const speakText = (text) => {
-    if (!voiceEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); 
-    const cleanText = text.replace(/!\[.*?\]\((.*?)\)/g, 'Here is the image you requested.');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.05;
-    window.speechSynthesis.speak(utterance);
-  };
+const toggleRecording = () => {
+  // Check for browser support
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return alert("Speech recognition is not supported in this browser.");
+
+  if (isRecording) {
+    recognitionRef.current?.stop();
+    setIsRecording(false);
+  } else {
+    // Re-initialize to ensure it's fresh
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.lang = 'en-US';
+    recognitionRef.current.interimResults = false;
+
+    recognitionRef.current.onstart = () => setIsRecording(true);
+    
+    recognitionRef.current.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev + (prev ? ' ' : '') + transcript);
+      setShowTextInput(true); // Switch to input mode so user sees the text
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error("Speech Error:", event.error);
+      setIsRecording(false);
+    };
+
+    recognitionRef.current.onend = () => setIsRecording(false);
+
+    recognitionRef.current.start();
+  }
+};
+
+const speakText = (text) => {
+  if (!voiceEnabled || !window.speechSynthesis) return;
+
+  // 1. Cancel any current speaking
+  window.speechSynthesis.cancel(); 
+
+  // 2. Clean markdown/links so the AI doesn't read URLs out loud
+  const cleanText = text.replace(/!\[.*?\]\((.*?)\)/g, 'Here is the image you requested.')
+                        .replace(/[#*_~`]/g, ''); // Remove markdown formatting
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  
+  // 3. Set a more natural voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Female'));
+  if (preferredVoice) utterance.voice = preferredVoice;
+
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+
+  window.speechSynthesis.speak(utterance);
+};
+
+// --- UPDATED HANDLE SEND (Unlocks Voice) ---
+
+const handleSend = async (e) => {
+  e?.preventDefault();
+  if (isLoading || (!input.trim() && !selectedImage && !activeVideoSource)) return;
+
+  // IMPORTANT: We must "trigger" a silent speech start here to "unlock" 
+  // the browser's audio permissions for the AI's eventual reply.
+  if (voiceEnabled) {
+    const unlocker = new SpeechSynthesisUtterance("");
+    window.speechSynthesis.speak(unlocker);
+  }
+
+  let imageToSend = selectedImage;
+  if (activeVideoSource) imageToSend = captureVideoFrame();
+
+  const userMsg = { role: 'user', text: input, image: imageToSend };
+  setMessages(prev => [...prev, userMsg]);
+  setIsLoading(true);
+  
+  const messagePayload = input;
+  setInput('');
+  setSelectedImage(null);
+  setShowTextInput(false);
+  if (activeVideoSource) stopVideo();
+
+  try {
+    setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
+
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/indra/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: messagePayload,
+        image: imageToSend,
+        modelType: selectedModel,
+        allowAutomation: automationEnabled,
+        history: messages,
+        projectId
+      })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let streamedText = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            if (data.text) {
+              streamedText += data.text;
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1].text = streamedText;
+                return updated;
+              });
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    // AI Speaks only after the full text is gathered to avoid "choppy" speech
+    speakText(streamedText);
+
+  } catch (err) {
+    console.error(err);
+    setMessages(prev => [...prev, { role: 'ai', text: 'Connection failed.' }]);
+  } finally {
+    setIsLoading(false);
+    setMessages(prev => {
+      const updated = [...prev];
+      if (updated[updated.length - 1]) updated[updated.length - 1].isStreaming = false;
+      return updated;
+    });
+  }
+};
 
   const downloadToDevice = async (url) => {
     try {
