@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 import { useMedia } from '../hooks/useMedia';
-import './ChatCore.css';
 
 export default function ChatCore({ projectId = 'default', _isCompact = false }) {
   const [messages, setMessages] = useState([]);
@@ -216,22 +215,22 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const isInputModeActive = showTextInput || isRecording || activeVideoSource || selectedImage;
 
   return (
-    <div id="indra-chat-core-container" className="chat-core-wrapper">
+    <div id="indra-chat-core-container" className="flex flex-col h-full w-full relative z-10 bg-[#0b0f1a] text-slate-200">
       
       {/* MODALS */}
       {showSaveDialog && (
-        <div className="modal-overlay">
-          <div className="modal-box w-full max-w-sm">
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-amber-500/20 rounded-2xl p-6 flex flex-col gap-4 shadow-2xl w-full max-w-sm">
             <div className="flex justify-between items-center">
               <h3 className="text-amber-400 font-bold tracking-wide">SAVE GENERATED IMAGE</h3>
               <button onClick={() => setShowSaveDialog(null)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
             <img src={showSaveDialog} className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
             <div className="flex flex-col gap-2">
-              <button onClick={() => downloadToDevice(showSaveDialog)} className="btn-primary">
+              <button onClick={() => downloadToDevice(showSaveDialog)} className="flex items-center justify-center gap-3 bg-amber-500 text-black py-3 rounded-xl font-bold hover:bg-amber-400 transition-all shadow-lg">
                 <Download size={18} /> Download to Device
               </button>
-              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="btn-secondary">
+              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="flex items-center justify-center gap-3 bg-white/5 text-white py-3 rounded-xl font-bold hover:bg-white/10 transition-all border border-white/10">
                 <Cloud size={18} /> Save to SmartSphere
               </button>
             </div>
@@ -240,8 +239,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       )}
 
       {isVaultOpen && (
-        <div className="modal-overlay">
-          <div className="modal-box w-full max-w-md">
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-amber-500/20 rounded-2xl p-6 flex flex-col gap-4 shadow-2xl w-full max-w-md">
             <div className="flex justify-between items-center">
               <h3 className="text-amber-400 font-bold flex items-center gap-2"><Database size={16}/> SMARTSPHERE VAULT</h3>
               <button onClick={() => setIsVaultOpen(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
@@ -258,7 +257,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       )}
 
       {/* HEADER */}
-      <div className="chat-header-bar">
+      <div className="p-3 bg-black/40 border-b border-white/5 flex flex-wrap gap-3 justify-between items-center z-20 backdrop-blur-md">
         <div className="relative group flex-1 min-w-[150px] max-w-[220px]">
           <select 
             value={selectedModel}
@@ -290,7 +289,10 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       </div>
 
       {/* CHAT MESSAGES */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 chat-scroll-area">
+      <div 
+        className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(245, 158, 11, 0.5) transparent' }}
+      >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 opacity-40">
             <Zap className="text-amber-500 mb-4" size={48} fill="currentColor" />
@@ -302,7 +304,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         {messages.map((msg, i) => (
           <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} max-w-[90%]`}>
-              <div className={msg.role === 'user' ? 'msg-bubble-user' : 'msg-bubble-ai'}>
+              <div className={msg.role === 'user' ? 'p-4 rounded-2xl shadow-xl bg-gradient-to-br from-amber-500 to-orange-500 text-black font-semibold' : 'p-4 rounded-2xl shadow-xl bg-white/5 border border-white/10 text-slate-200'}>
                 {msg.image && <img src={msg.image} className="rounded-xl mb-3 max-h-48 object-cover border border-white/10 shadow-lg" alt="upload"/>}
                 <div className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
                    {renderMessageText(msg.text)}
@@ -325,20 +327,18 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       </div>
 
       {/* --- CENTRAL THUNDERBOLT ACTION HUB --- */}
-      <div className="action-hub-container">
+      <div className="p-6 bg-black/20 border-t border-white/10 flex flex-col items-center justify-center relative min-h-[100px]">
         
-{selectedImage && (
-  <>
-    <div className="absolute -top-16 left-6 bg-[#0f172a] p-1.5 rounded-xl border border-white/10 shadow-2xl z-10 transition-all duration-300">
-      <div className="relative">
-        <img src={selectedImage} alt="Preview" className="h-12 w-12 object-cover rounded-lg" />
-        <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5">
-          <X size={12} />
-        </button>
-      </div>
-    </div>
-  </>
-)}
+        {selectedImage && (
+          <div className="absolute -top-16 left-6 bg-[#0f172a] p-1.5 rounded-xl border border-white/10 shadow-2xl z-10 transition-all duration-300">
+            <div className="relative">
+              <img src={selectedImage} alt="Preview" className="h-12 w-12 object-cover rounded-lg" />
+              <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5">
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        )}
 
         <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
 
@@ -353,48 +353,48 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={isRecording ? "Listening..." : "Type your command..."}
-              className="chat-input-field"
+              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all shadow-2xl placeholder:text-gray-600"
               autoFocus
             />
             
-            <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage && !activeVideoSource)} className="send-btn">
+            <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage && !activeVideoSource)} className="p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-lg shadow-amber-500/40 transition-all">
               <Send size={22} />
             </button>
           </div>
         ) : (
           <div className="flex justify-center items-center w-full relative">
             {showActionMenu && (
-              <div className="action-menu-popup">
-                <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="action-icon-btn">
+              <div className="absolute bottom-24 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-2xl p-4 rounded-[40px] border border-white/10 shadow-2xl w-[95%] max-w-[360px] duration-200">
+                <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
                   <Search size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="action-icon-text">SEARCH</span>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">SEARCH</span>
                 </button>
-                <button onClick={() => { handleMicClick(); setShowActionMenu(false); }} className="action-icon-btn">
+                <button onClick={() => { handleMicClick(); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
                   <Mic size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="action-icon-text">VOICE</span>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">VOICE</span>
                 </button>
-                <button onClick={() => { toggleCamera(); setShowTextInput(true); setShowActionMenu(false); }} className="action-icon-btn">
+                <button onClick={() => { toggleCamera(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
                   <Camera size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="action-icon-text">CAMERA</span>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">CAMERA</span>
                 </button>
-                <button onClick={() => { toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false); }} className="action-icon-btn">
+                <button onClick={() => { toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
                   <MonitorUp size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="action-icon-text">PRESENT</span>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">PRESENT</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="action-icon-btn">
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
                   <HardDrive size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="action-icon-text">DEVICE</span>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">DEVICE</span>
                 </button>
-                <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="action-icon-btn">
+                <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
                   <Database size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="action-icon-text">VAULT</span>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">VAULT</span>
                 </button>
               </div>
             )}
 
             <button 
               onClick={() => setShowActionMenu(!showActionMenu)}
-              className={`thunderbolt-main-btn ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-lg'}`}
+              className={`w-20 h-20 rounded-full flex items-center justify-center text-black shadow-2xl transition-all duration-500 z-20 ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-lg'}`}
             >
               {showActionMenu ? <X size={32} /> : <Zap size={32} fill="currentColor" />}
             </button>
