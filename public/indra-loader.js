@@ -2,17 +2,37 @@
   if (window.IndraWidgetLoaded) return;
   window.IndraWidgetLoaded = true;
 
-  // 1. Get the script tag that loaded this file
   const scriptTag = document.currentScript;
-  
-  // 2. Extract the Project ID (default to 'default' if not provided)
   const projectId = scriptTag.getAttribute('data-project-id') || 'default';
 
+  // --- SHADOW DOM WRAPPER (Prevents host CSS leakage) ---
+  const host = document.createElement('div');
+  host.id = 'indra-agent-root';
+  document.body.appendChild(host);
+  const shadow = host.attachShadow({ mode: 'open' });
+
+  const container = document.createElement('div');
+  container.id = 'indra-widget-container';
+  
   const style = document.createElement('style');
-  style.innerHTML = `
+  style.textContent = `
+    :host { all: initial; }
     #indra-widget-container { position: fixed; bottom: 20px; right: 20px; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-end; font-family: sans-serif; }
-    #indra-iframe { width: 380px; height: 600px; max-height: calc(100vh - 100px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); display: none; margin-bottom: 16px; background: #0f172a; transition: opacity 0.3s ease; overflow: hidden; }
-    #indra-toggle-btn { width: 60px; height: 60px; border-radius: 30px; background: linear-gradient(135deg, #9333ea, #6366f1); color: white; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4); display: flex; justify-content: center; align-items: center; transition: transform 0.2s, box-shadow 0.2s; }
+    #indra-iframe { 
+      width: 380px; height: 600px; max-height: calc(100vh - 100px); 
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; 
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3); display: none; 
+      margin-bottom: 16px; background: #0f172a; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+      overflow: hidden; opacity: 0; transform: translateY(10px);
+    }
+    #indra-iframe.visible { display: block; opacity: 1; transform: translateY(0); }
+    #indra-toggle-btn { 
+      width: 60px; height: 60px; border-radius: 30px; 
+      background: linear-gradient(135deg, #9333ea, #6366f1); color: white; 
+      border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4); 
+      display: flex; justify-content: center; align-items: center; 
+      transition: transform 0.2s, box-shadow 0.2s; 
+    }
     #indra-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(147, 51, 234, 0.6); }
     #indra-toggle-btn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
     
@@ -21,118 +41,99 @@
       70% { box-shadow: 0 0 0 10px rgba(147, 51, 234, 0); outline: 2px solid rgba(147, 51, 234, 0.5); }
       100% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0); outline: transparent; }
     }
-    .indra-agent-highlight { animation: indraAgentPulse 1s ease-out forwards; border-radius: inherit; }
-
+    .indra-highlight { animation: indraAgentPulse 1s ease-out forwards; }
     @media (max-width: 480px) { #indra-iframe { width: calc(100vw - 40px); } }
   `;
-  document.head.appendChild(style);
-
-  const container = document.createElement('div');
-  container.id = 'indra-widget-container';
 
   const iframe = document.createElement('iframe');
   iframe.id = 'indra-iframe';
-  
-  // 3. Pass the Project ID to your hosted widget UI via URL parameters
   iframe.src = `https://indra.ialksng.me/#/widget?projectId=${projectId}`;
   iframe.allow = "camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write";
+  iframe.frameBorder = "0";
 
   const button = document.createElement('button');
   button.id = 'indra-toggle-btn';
-
   const chatIcon = `<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
   const closeIcon = `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-
   button.innerHTML = chatIcon;
 
   let isOpen = false;
   button.onclick = () => {
     isOpen = !isOpen;
-    iframe.style.display = isOpen ? 'block' : 'none';
-    button.innerHTML = isOpen ? closeIcon : chatIcon;
+    if (isOpen) {
+      iframe.classList.add('visible');
+      button.innerHTML = closeIcon;
+    } else {
+      iframe.classList.remove('visible');
+      button.innerHTML = chatIcon;
+    }
   };
 
+  shadow.appendChild(style);
   container.appendChild(iframe);
   container.appendChild(button);
-  document.body.appendChild(container);
+  shadow.appendChild(container);
 
-  // --- Helper to show visual feedback ---
-  const highlightElement = (el) => {
-    el.classList.add('indra-agent-highlight');
-    setTimeout(() => el.classList.remove('indra-agent-highlight'), 1000);
+  // --- AUTOMATION UTILITIES ---
+  const highlight = (el) => {
+    el.classList.add('indra-highlight');
+    setTimeout(() => el.classList.remove('indra-highlight'), 1200);
   };
 
+  // --- MESSAGE HUB ---
   window.addEventListener('message', (event) => {
-    // SECURITY: Only accept messages from your domain!
-    if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return; 
+    if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost')) return;
 
-    const data = event.data;
+    const { type, payload } = event.data;
 
-    // --- Handle Request for DOM Map ---
-    if (data && data.type === 'REQUEST_DOM_MAP') {
-        const elements = document.querySelectorAll('a, button, input, select, textarea, [role="button"]');
-        const map = [];
-        let idCounter = 0;
-
-        elements.forEach((el) => {
-            if (el.closest('#indra-widget-container')) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
-
-            const indraId = 'indra-element-' + (idCounter++);
-            el.setAttribute('data-indra-id', indraId);
-
-            let textContent = (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().substring(0, 50);
-            if (!textContent && el.tagName === 'A') textContent = el.href;
-
-            if (textContent) {
-                map.push({
-                    type: el.tagName.toLowerCase(),
-                    text: textContent,
-                    selector: `[data-indra-id="${indraId}"]` 
-                });
-            }
+    if (type === 'REQUEST_DOM_MAP') {
+      const elements = document.querySelectorAll('a, button, input, select, textarea, [role="button"]');
+      const map = Array.from(elements)
+        .filter(el => {
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && !el.closest('#indra-agent-root');
+        })
+        .map((el, i) => {
+          const id = `indra-el-${i}`;
+          el.setAttribute('data-indra-id', id);
+          return {
+            type: el.tagName.toLowerCase(),
+            text: (el.innerText || el.placeholder || el.value || el.ariaLabel || '').trim().substring(0, 50),
+            selector: `[data-indra-id="${id}"]`
+          };
         });
-
-        iframe.contentWindow.postMessage({ type: 'DOM_MAP_RESPONSE', payload: map }, '*');
+      iframe.contentWindow.postMessage({ type: 'DOM_MAP_RESPONSE', payload: map }, '*');
     }
 
-    // --- Handle Execution of Actions ---
-    if (data && data.type === 'INDRA_ACTION') {
-      const { action, selector, value } = data.payload;
-      console.log(`[Indra Agent] Executing: ${action} on ${selector}`);
+    if (type === 'INDRA_ACTION') {
+      const { action, selector, value } = payload;
+      const element = document.querySelector(selector);
+      if (!element) return console.warn("[Indra] Target lost:", selector);
 
-      try {
-        const element = document.querySelector(selector);
-        
-        if (!element) {
-          console.warn(`[Indra Agent] Element not found: ${selector}`);
-          return;
-        }
-
-        highlightElement(element);
-
-        switch (action) {
-          case 'click':
-            element.click();
-            break;
-          case 'fill':
-            element.value = value;
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-            element.dispatchEvent(new Event('change', { bubbles: true }));
-            break;
-          case 'navigate':
-            window.location.href = value;
-            break;
-          case 'scroll':
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            break;
-          default:
-            console.warn(`[Indra Agent] Unknown action: ${action}`);
-        }
-      } catch (error) {
-        console.error('[Indra Agent] Action failed:', error);
+      highlight(element);
+      
+      switch (action) {
+        case 'click': 
+          element.click(); 
+          break;
+        case 'fill': 
+          element.value = value;
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          break;
+        case 'scroll': 
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+          break;
+        case 'navigate': 
+          window.location.href = value; 
+          break;
       }
+    }
+
+    // New: Handle dynamic iframe resizing (e.g. for vault expansion)
+    if (type === 'SET_WIDGET_SIZE') {
+        iframe.style.width = payload.width || '380px';
+        iframe.style.height = payload.height || '600px';
     }
   });
 })();
