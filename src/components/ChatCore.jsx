@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, ShieldAlert, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
-import apiClient from '../services/apiClient';
 
-export default function ChatCore({ projectId = 'default', isCompact = false }) {
+export default function ChatCore({ projectId = 'default', _isCompact = false }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +32,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // --- 🎙️ VOICE ENGINE ---
+  // Speech-to-Text Initialization
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -45,7 +44,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         const transcript = event.results[0][0].transcript;
         setInput(prev => prev + (prev ? ' ' : '') + transcript);
         setIsRecording(false);
-        setShowTextInput(true); 
+        setShowTextInput(true); // Switch to input mode so user can see/edit
       };
       
       recognitionRef.current.onerror = () => setIsRecording(false);
@@ -53,90 +52,97 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   }, []);
 
+  // ALL POSSIBLE FREE MODELS
+  const models = [
+    { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
+    { id: 'flash-lite', name: '🍃 Gemini Flash Lite' },
+    { id: 'pro', name: '🧠 Gemini Pro (Complex)' },
+    { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
+    { id: 'deepseek', name: '🤔 DeepSeek R1 (Math/Logic)' },
+    { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
+    { id: 'groq-vision', name: '👁️ Llama Vision (Image Reader)' },
+    { id: 'or-mistral', name: '🌪️ Mistral 7B' },
+    { id: 'or-gemma', name: '💎 Google Gemma 9B' },
+    { id: 'or-phi', name: '🔬 Microsoft Phi-3' },
+    { id: 'or-qwen', name: '🐉 Alibaba Qwen 7B' },
+    { id: 'image-generator', name: '🎨 Image Generator' },
+    { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
+  ];
+
+  // --- VOICE & IMAGE UTILS ---
+
   const toggleRecording = () => {
-    if (!recognitionRef.current) return alert("Speech recognition not supported in this browser.");
+    // Check for browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Speech recognition is not supported in this browser.");
+
     if (isRecording) {
-      recognitionRef.current.stop();
+      recognitionRef.current?.stop();
       setIsRecording(false);
     } else {
+      // Re-initialize to ensure it's fresh
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onstart = () => setIsRecording(true);
+      
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => prev + (prev ? ' ' : '') + transcript);
+        setShowTextInput(true); // Switch to input mode so user sees the text
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech Error:", event.error);
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onend = () => setIsRecording(false);
+
       recognitionRef.current.start();
-      setIsRecording(true);
     }
   };
 
   const speakText = (text) => {
     if (!voiceEnabled || !window.speechSynthesis) return;
+
+    // 1. Cancel any current speaking queue
     window.speechSynthesis.cancel(); 
-    // Remove markdown image URLs and formatting for speech
-    const cleanText = text.replace(/!\[.*?\]\((.*?)\)/g, 'Here is the image you requested.')
-                          .replace(/[#*_~`]/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Female'));
-    if (preferredVoice) utterance.voice = preferredVoice;
-    utterance.rate = 1.0;
-    window.speechSynthesis.speak(utterance);
+
+    // 2. Clean markdown/links so the AI doesn't read URLs out loud
+    const cleanText = text
+      .replace(/!\[.*?\]\((.*?)\)/g, 'Here is the image you requested.')
+      .replace(/[#*_~`]/g, '');
+
+    // Wait a tiny fraction of a second after cancel before speaking again
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      // 3. Set a more natural voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Female'));
+      if (preferredVoice) utterance.voice = preferredVoice;
+
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      window.speechSynthesis.speak(utterance);
+    }, 50);
   };
 
-  // --- 🤖 WEB AGENT / AUTOMATION HANDLERS ---
-  const approveAction = (actionDetails, messageIndex) => {
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab?.id) {
-          chrome.tabs.sendMessage(activeTab.id, { type: 'EXECUTE_ACTION', payload: actionDetails });
-        }
-      });
-    } else {
-      const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
-      window.parent.postMessage({ type: 'INDRA_ACTION', payload: actionDetails }, targetOrigin);
-    }
+  // --- UNIFIED HANDLE SEND ---
 
-    setMessages(prev => {
-      const newMessages = [...prev];
-      newMessages[messageIndex].pendingAction.status = 'approved';
-      return newMessages;
-    });
-  };
-
-  const denyAction = (messageIndex) => {
-    setMessages(prev => {
-      const newMessages = [...prev];
-      newMessages[messageIndex].pendingAction.status = 'denied';
-      return newMessages;
-    });
-  };
-
-  const fetchDomMap = () => {
-    return new Promise((resolve) => {
-      if (!automationEnabled) return resolve([]);
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          const activeTab = tabs[0];
-          if (!activeTab?.id) return resolve([]);
-          chrome.tabs.sendMessage(activeTab.id, { type: 'GET_LIVE_CONTEXT' }, (response) => {
-            if (chrome.runtime.lastError || !response) return resolve([]);
-            resolve(response.map);
-          });
-        });
-      } else {
-        const elements = document.querySelectorAll('a, button, input, select, textarea');
-        const map = Array.from(elements).map((el, i) => {
-          const indraId = `indra-element-${i}`;
-          el.setAttribute('data-indra-id', indraId);
-          return { type: el.tagName.toLowerCase(), text: (el.innerText || el.placeholder || "").substring(0, 50), selector: `[data-indra-id="${indraId}"]` };
-        });
-        resolve(map);
-      }
-    });
-  };
-
-  // --- 🛰️ STREAMING SEND LOGIC ---
   const handleSend = async (e) => {
     e?.preventDefault();
     if (isLoading || (!input.trim() && !selectedImage && !activeVideoSource)) return;
 
-    if (voiceEnabled) window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // Unlock Audio
+    // IMPORTANT: Trigger a silent speech start synchronously on click
+    // This unlocks the browser's audio permissions for the delayed AI reply.
+    if (voiceEnabled && window.speechSynthesis) {
+      const unlocker = new SpeechSynthesisUtterance("");
+      window.speechSynthesis.speak(unlocker);
+    }
 
     let imageToSend = selectedImage;
     if (activeVideoSource) imageToSend = captureVideoFrame();
@@ -145,6 +151,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
     
+    // Clear inputs and reset UI
     const messagePayload = input;
     setInput('');
     setSelectedImage(null);
@@ -152,7 +159,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     if (activeVideoSource) stopVideo();
 
     try {
-      const currentDomMap = await fetchDomMap();
+      // Add empty AI message placeholder
       setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
 
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/indra/chat`, {
@@ -163,12 +170,12 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           image: imageToSend,
           modelType: selectedModel,
           allowAutomation: automationEnabled,
-          domMap: currentDomMap,
-          vaultData: selectedModel === 'smartsphere-rag' ? vaultData : null,
           history: messages,
           projectId
         })
       });
+
+      if (!response.body) throw new Error("ReadableStream not supported.");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -180,6 +187,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
+        
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
@@ -195,11 +203,14 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
                   return updated;
                 });
               }
-            } catch (e) {}
+            } catch (_e) { /* partial chunk */ }
           }
         }
       }
+
+      // Speak the accumulated text once streaming finishes
       speakText(streamedText);
+
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, { role: 'ai', text: 'Connection failed.' }]);
@@ -213,21 +224,27 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   };
 
-  // --- 🎨 IMAGE HANDLERS ---
   const downloadToDevice = async (url) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = blobUrl;
       a.download = `indra_gen_${Date.now()}.jpg`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
       setShowSaveDialog(null);
-    } catch (e) { window.open(url, '_blank'); }
+    } catch (_e) {
+      window.open(url, '_blank');
+      setShowSaveDialog(null);
+    }
   };
 
   const saveToSmartSphere = (url) => {
-    setVaultData(prev => prev + (prev ? '\n\n' : '') + `[Reference Image]: ${url}`);
+    setVaultData(prev => prev + (prev ? '\n\n' : '') + `[Saved Reference Image]: ${url}`);
     setIsVaultOpen(true);
     setShowSaveDialog(null);
   };
@@ -244,11 +261,11 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       }
       const imgUrl = match[1];
       parts.push(
-        <div key={`img-${match.index}`} className="relative group my-4">
-          <img src={imgUrl} alt="AI Gen" className="rounded-xl border border-white/10 shadow-2xl max-h-72 object-cover" />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center rounded-xl backdrop-blur-sm">
-             <button onClick={() => setShowSaveDialog(imgUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg font-bold hover:scale-105 transition-all">
-               <Download size={16} className="inline mr-2" /> Save Options
+        <div key={`img-${match.index}`} className="relative group mt-3 mb-3 block">
+          <img src={imgUrl} alt="AI Gen" className="rounded-xl max-h-64 object-cover border border-white/10 shadow-lg" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
+             <button onClick={() => setShowSaveDialog(imgUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
+               <Download size={16} /> Save Options
              </button>
           </div>
         </div>
@@ -259,9 +276,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     return parts.length > 0 ? parts : text;
   };
 
-  // --- 🎥 CAMERA UTILS ---
+  // --- CAMERA / SCREEN / FILE HANDLERS ---
+
   const stopVideo = () => { 
-    if (videoRef.current?.srcObject) {
+    if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
@@ -272,10 +290,14 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     if (activeVideoSource === 'camera') stopVideo();
     else {
       try {
+        stopVideo();
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
         setActiveVideoSource('camera');
-      } catch (err) { alert("Camera denied."); }
+      } catch (_err) { console.warn("Camera denied."); }
     }
   };
 
@@ -283,18 +305,24 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     if (activeVideoSource === 'screen') stopVideo();
     else {
       try {
+        stopVideo();
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
         setActiveVideoSource('screen');
-      } catch (err) { console.warn(err); }
+        stream.getVideoTracks()[0].onended = () => stopVideo();
+      } catch (_err) { console.warn("Screen share denied."); }
     }
   };
 
   const captureVideoFrame = () => { 
-    if (!videoRef.current || !canvasRef.current) return null;
+    if (!activeVideoSource || !videoRef.current || !canvasRef.current) return null;
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     return canvas.toDataURL('image/jpeg', 0.8);
   };
@@ -303,174 +331,206 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => { setSelectedImage(reader.result); setShowActionMenu(false); setShowTextInput(true); };
+    reader.onloadend = () => {
+      setSelectedImage(reader.result);
+      setShowActionMenu(false);
+      setShowTextInput(true); // Jump into input mode
+    };
     reader.readAsDataURL(file);
   };
-
-  const models = [
-    { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
-    { id: 'pro', name: '🧠 Gemini 1.5 Pro' },
-    { id: 'gemini-search', name: '🌐 Web Search' },
-    { id: 'deepseek', name: '🤔 DeepSeek R1' },
-    { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
-    { id: 'groq-vision', name: '👁️ Llama Vision' },
-    { id: 'or-mistral', name: '🌪️ Mistral 7B' },
-    { id: 'or-gemma', name: '💎 Gemma 9B' },
-    { id: 'image-generator', name: '🎨 Image Gen' },
-    { id: 'smartsphere-rag', name: '📚 SmartSphere' }
-  ];
 
   const isInputModeActive = showTextInput || isRecording || activeVideoSource || selectedImage;
 
   return (
-    <div id="indra-chat-core-container" className="flex flex-col h-full w-full relative z-10 bg-[#0b0f1a] text-slate-200 font-sans">
+    <div id="indra-chat-core-container" className="flex flex-col h-full w-full relative z-10 bg-[#0b0f1a] text-slate-200">
       
-      {/* MODAL: IMAGE SAVE */}
+      {/* MODAL: IMAGE SAVE OPTIONS */}
       {showSaveDialog && (
-        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#0f172a] border border-amber-500/20 rounded-3xl w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95">
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-amber-500/20 rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="text-amber-400 font-bold uppercase text-xs tracking-widest">Save Options</h3>
+              <h3 className="text-amber-400 font-bold tracking-wide">SAVE GENERATED IMAGE</h3>
               <button onClick={() => setShowSaveDialog(null)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
-            <img src={showSaveDialog} className="rounded-xl max-h-48 object-contain bg-black/50" alt="Preview" />
+            <img src={showSaveDialog} className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
             <div className="flex flex-col gap-2">
-              <button onClick={() => downloadToDevice(showSaveDialog)} className="bg-amber-500 text-black py-3 rounded-2xl font-bold hover:bg-amber-400 transition-all shadow-lg flex items-center justify-center gap-2">
-                <Download size={18} /> Download
+              <button onClick={() => downloadToDevice(showSaveDialog)} className="flex items-center justify-center gap-3 bg-amber-500 text-black py-3 rounded-xl font-bold hover:bg-amber-400 transition-all shadow-lg">
+                <Download size={18} /> Download to Device
               </button>
-              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="bg-white/5 text-white py-3 rounded-2xl font-bold hover:bg-white/10 transition-all border border-white/10 flex items-center justify-center gap-2">
-                <Cloud size={18} /> Send to Vault
+              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="flex items-center justify-center gap-3 bg-white/5 text-white py-3 rounded-xl font-bold hover:bg-white/10 transition-all border border-white/10">
+                <Cloud size={18} /> Save to SmartSphere
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: SMARTSPHERE VAULT */}
+      {/* SMARTSPHERE MODAL */}
       {isVaultOpen && (
-        <div className="absolute inset-0 bg-black/80 z-40 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#0f172a] border border-amber-500/20 rounded-3xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
+        <div className="absolute inset-0 bg-black/80 z-40 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#0f172a] border border-amber-500/20 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="text-amber-400 font-bold flex items-center gap-2 text-xs tracking-widest uppercase"><Database size={14}/> SmartSphere Vault</h3>
+              <h3 className="text-amber-400 font-bold flex items-center gap-2">
+                <Database size={16}/> SMARTSPHERE VAULT
+              </h3>
               <button onClick={() => setIsVaultOpen(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
-            <textarea value={vaultData} onChange={(e) => setVaultData(e.target.value)} className="w-full h-56 bg-black/40 border border-white/10 rounded-2xl p-4 text-white focus:border-amber-500 focus:outline-none resize-none" placeholder="Paste knowledge here..." />
-            <button onClick={() => setIsVaultOpen(false)} className="bg-amber-500 text-black py-3 rounded-2xl font-bold shadow-lg">SAVE TO VAULT</button>
+            <textarea
+              value={vaultData}
+              onChange={(e) => setVaultData(e.target.value)}
+              className="w-full h-56 bg-black/50 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-amber-500 focus:outline-none resize-none shadow-inner"
+              placeholder="Paste reference data here..."
+            />
+            <button onClick={() => setIsVaultOpen(false)} className="bg-amber-500 text-black py-3 rounded-xl font-bold text-sm tracking-widest shadow-lg">SAVE TO VAULT</button>
           </div>
         </div>
       )}
 
       {/* HEADER */}
-      <div className="p-4 bg-black/40 border-b border-white/5 flex justify-between items-center z-20 backdrop-blur-md">
-        <div className="relative">
-          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className="appearance-none bg-white/5 text-white px-4 py-2 pr-10 rounded-xl border border-white/10 focus:outline-none text-xs font-bold uppercase tracking-widest">
+      <div className="p-3 bg-black/40 border-b border-white/5 flex flex-wrap gap-3 justify-between items-center z-20 backdrop-blur-md">
+        <div className="relative group flex-1 min-w-[150px] max-w-[220px]">
+          <select 
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full appearance-none bg-white/5 text-white px-4 py-2 pr-10 rounded-xl border border-white/10 focus:outline-none focus:border-amber-500 cursor-pointer text-xs font-bold"
+          >
             {models.map(m => <option className="bg-slate-900" key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <ChevronDown size={14} className="absolute right-3 top-2.5 pointer-events-none text-gray-500" />
+          <ChevronDown size={14} className="absolute right-3 top-2.5 pointer-events-none text-gray-400" />
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={() => { setVoiceEnabled(!voiceEnabled); if (voiceEnabled) window.speechSynthesis?.cancel(); }} className={`p-2.5 rounded-xl border transition-all ${voiceEnabled ? 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'}`}>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => { setVoiceEnabled(!voiceEnabled); if (voiceEnabled) window.speechSynthesis?.cancel(); }}
+            className={`p-2 rounded-xl border transition-all ${voiceEnabled ? 'bg-amber-500/10 border-amber-500/50 text-amber-400' : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'}`}
+          >
             {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
-          <button onClick={() => setAutomationEnabled(!automationEnabled)} className={`p-2.5 rounded-xl border transition-all ${automationEnabled ? 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'}`}>
-            <MousePointerClick size={18} />
-          </button>
+
+          <label className="flex items-center gap-2 cursor-pointer bg-white/5 px-3 py-2 rounded-xl border border-white/10 hover:bg-white/10 transition-all">
+            <input type="checkbox" checked={automationEnabled} onChange={(e) => setAutomationEnabled(e.target.checked)} className="hidden" />
+            <MousePointerClick size={16} className={automationEnabled ? "text-amber-400" : "text-gray-500"} />
+            <span className="text-[10px] font-bold hidden sm:block">AGENT</span>
+            <div className={`w-7 h-4 rounded-full relative transition-all ${automationEnabled ? 'bg-amber-500' : 'bg-white/10'}`}>
+              <div className={`absolute top-0.5 left-0.5 bg-white w-3 h-3 rounded-full transition-all ${automationEnabled ? 'translate-x-3' : 'translate-x-0'}`} />
+            </div>
+          </label>
         </div>
       </div>
 
       {/* CHAT MESSAGES */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full opacity-20 scale-110">
-            <Zap className="text-amber-500 mb-6 animate-pulse" size={64} fill="currentColor" />
-            <h3 className="text-white font-black text-2xl tracking-tighter uppercase">Indra Core</h3>
+          <div className="flex flex-col items-center justify-center h-full text-center p-6 opacity-40">
+            <Zap className="text-amber-500 mb-4" size={48} fill="currentColor" />
+            <h3 className="text-white font-bold text-xl mb-2 tracking-tighter">INDRA CORE</h3>
+            <p className="text-sm max-w-xs">AI Assistant ready for search, vision, and web automation.</p>
           </div>
         )}
+
         {messages.map((msg, i) => (
-          <div key={i} className={`flex flex-col gap-3 ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in`}>
+          <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} max-w-[90%]`}>
-              <div className={`p-5 rounded-3xl shadow-2xl ${msg.role === 'user' ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-black font-bold' : 'bg-white/5 border border-white/5 text-slate-200'}`}>
-                {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-56 object-cover" alt="media"/>}
-                <div className="text-sm sm:text-base leading-relaxed">{renderMessageText(msg.text)}</div>
+              <div className={`p-4 rounded-2xl shadow-xl ${msg.role === 'user' ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-black font-semibold' : 'bg-white/5 border border-white/10 text-slate-200'}`}>
+                {msg.image && <img src={msg.image} className="rounded-xl mb-3 max-h-48 object-cover border border-white/10 shadow-lg" alt="upload"/>}
+                <div className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
+                   {renderMessageText(msg.text)}
+                </div>
               </div>
             </div>
-
-            {/* AUTOMATION ACTION UI */}
-            {msg.pendingAction && (
-              <div className="ml-2 p-4 bg-black/40 border border-amber-500/30 rounded-2xl max-w-[85%] flex flex-col gap-3 backdrop-blur-md">
-                <div className="flex items-center gap-2 text-amber-400 text-[10px] font-black uppercase tracking-widest">
-                  <Zap size={12} fill="currentColor" /> Action Requested
-                </div>
-                <div className="bg-black/60 p-2 rounded text-[10px] font-mono text-gray-300 border border-white/5">
-                  {msg.pendingAction.action.toUpperCase()} <span className="text-orange-400">{msg.pendingAction.selector}</span>
-                </div>
-                {msg.pendingAction.status === 'waiting' && (
-                  <div className="flex gap-2">
-                    <button onClick={() => approveAction(msg.pendingAction, i)} className="flex-1 bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-black py-2 rounded-lg transition-all">APPROVE</button>
-                    <button onClick={() => denyAction(i)} className="flex-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black py-2 rounded-lg transition-all">DENY</button>
-                  </div>
-                )}
-                {msg.pendingAction.status === 'approved' && <span className="text-[10px] text-emerald-500 font-black tracking-widest">✓ EXECUTED</span>}
-                {msg.pendingAction.status === 'denied' && <span className="text-[10px] text-red-500 font-black tracking-widest">✗ DENIED</span>}
-              </div>
-            )}
           </div>
         ))}
         {isLoading && !messages[messages.length-1]?.isStreaming && <Loader2 className="animate-spin text-amber-500 mx-auto" size={24} />}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* CAMERA / SCREEN PREVIEW */}
-      <div className={`p-4 justify-center ${activeVideoSource ? 'flex' : 'hidden'}`}>
-        <div className="relative rounded-[30px] overflow-hidden border-2 border-amber-500/40 shadow-2xl">
-          <video ref={videoRef} className={`h-40 bg-black object-contain ${activeVideoSource === 'camera' ? 'scale-x-[-1]' : ''}`} muted playsInline />
-          <button onClick={stopVideo} className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white"><X size={16} /></button>
+      {/* LIVE VIDEO PREVIEW */}
+      <div className={`p-2 bg-black/40 border-t border-white/10 flex justify-center backdrop-blur-md ${activeVideoSource ? 'flex' : 'hidden'}`}>
+        <div className="relative rounded-xl overflow-hidden border-2 border-amber-500/30 shadow-2xl">
+          <video ref={videoRef} className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'scale-x-[-1]' : ''}`} muted playsInline />
+          <button onClick={stopVideo} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white hover:bg-red-500"><X size={12} /></button>
         </div>
+        <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* --- ACTION HUB AREA --- */}
-      <div className="p-8 flex flex-col items-center justify-center relative min-h-[120px]">
-        {selectedImage && <div className="absolute -top-16 left-10 bg-[#0f172a] p-1.5 rounded-2xl border border-white/10 shadow-2xl"><img src={selectedImage} className="h-14 w-14 object-cover rounded-xl" /></div>}
-        <input type="file" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" accept="image/*" />
+      {/* --- CENTRAL THUNDERBOLT ACTION HUB --- */}
+      <div className="p-6 bg-black/20 border-t border-white/10 flex flex-col items-center justify-center relative min-h-[100px]">
         
+        {/* Attachment Preview */}
+        {selectedImage && (
+          <div className="absolute -top-16 left-6 bg-[#0f172a] p-1.5 rounded-xl border border-white/10 shadow-2xl z-10 animate-in fade-in slide-in-from-bottom-2">
+            <div className="relative">
+              <img src={selectedImage} alt="Preview" className="h-12 w-12 object-cover rounded-lg" />
+              <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"><X size={12} /></button>
+            </div>
+          </div>
+        )}
+
+        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
+
         {isInputModeActive ? (
-          <div className="flex items-center gap-3 w-full max-w-4xl animate-in slide-in-from-bottom-5">
-            <button onClick={() => {setShowTextInput(false); stopVideo(); setIsRecording(false); setSelectedImage(null);}} className="p-4 bg-white/5 rounded-full text-gray-500"><X size={24}/></button>
-            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder={isRecording ? "Listening..." : "Command Indra..."} className="flex-1 bg-white/5 border border-white/10 rounded-[30px] px-8 py-5 focus:border-amber-500 outline-none text-white shadow-2xl placeholder:text-gray-700" autoFocus />
-            <button onClick={handleSend} disabled={isLoading} className="p-5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-[25px] text-black shadow-lg hover:scale-105 transition-all"><Send size={24}/></button>
+          // --- INPUT BOX MODE ---
+          <div className="flex items-center gap-3 w-full max-w-4xl transition-all duration-300">
+            <button onClick={() => { setShowTextInput(false); if (isRecording) toggleRecording(); stopVideo(); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-gray-500 transition-colors">
+              <X size={20} />
+            </button>
+
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder={isRecording ? "Listening..." : "Type your command..."}
+              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all shadow-2xl placeholder:text-gray-600"
+              autoFocus
+            />
+            
+            <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage)} className="p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all">
+              <Send size={22} />
+            </button>
           </div>
         ) : (
-          <div className="relative">
+          // --- THUNDERBOLT HUB MODE ---
+          <div className="flex justify-center items-center w-full relative">
+            
             {showActionMenu && (
-              <div className="absolute bottom-28 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-3 bg-[#0f172a]/95 backdrop-blur-3xl p-6 rounded-[50px] border border-white/10 shadow-[0_30px_90px_rgba(0,0,0,0.9)] w-[360px] animate-in zoom-in-90 duration-300">
-                <button onClick={() => {setShowTextInput(true); setShowActionMenu(false);}} className="flex flex-col items-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[35px] transition-all group">
-                  <Search size={26} className="group-hover:text-amber-400" /><span className="text-[10px] font-black text-gray-500 uppercase">Search</span>
+              <div className="absolute bottom-24 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-2xl p-4 rounded-[40px] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.8)] w-[95%] max-w-[360px] animate-in fade-in zoom-in-95 duration-200">
+                <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                  <Search size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">SEARCH</span>
                 </button>
-                <button onClick={() => {toggleRecording(); setShowActionMenu(false);}} className="flex flex-col items-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[35px] transition-all group">
-                  <Mic size={26} className="group-hover:text-amber-400" /><span className="text-[10px] font-black text-gray-500 uppercase">Voice</span>
+                <button onClick={() => { toggleRecording(); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                  <Mic size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">VOICE</span>
                 </button>
-                <button onClick={() => {toggleCamera(); setShowTextInput(true); setShowActionMenu(false);}} className="flex flex-col items-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[35px] transition-all group">
-                  <Camera size={26} className="group-hover:text-amber-400" /><span className="text-[10px] font-black text-gray-500 uppercase">Camera</span>
+                <button onClick={() => { toggleCamera(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                  <Camera size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">CAMERA</span>
                 </button>
-                <button onClick={() => {toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false);}} className="flex flex-col items-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[35px] transition-all group">
-                  <MonitorUp size={26} className="group-hover:text-amber-400" /><span className="text-[10px] font-black text-gray-500 uppercase">Present</span>
+                <button onClick={() => { toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                  <MonitorUp size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">PRESENT</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[35px] transition-all group">
-                  <HardDrive size={26} className="group-hover:text-amber-400" /><span className="text-[10px] font-black text-gray-500 uppercase">Device</span>
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                  <HardDrive size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">DEVICE</span>
                 </button>
-                <button onClick={() => {setIsVaultOpen(true); setShowActionMenu(false);}} className="flex flex-col items-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[35px] transition-all group">
-                  <Database size={26} className="group-hover:text-amber-400" /><span className="text-[10px] font-black text-gray-500 uppercase">Vault</span>
+                <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                  <Database size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
+                  <span className="text-[9px] font-black tracking-widest text-gray-500">VAULT</span>
                 </button>
               </div>
             )}
-            <button onClick={() => setShowActionMenu(!showActionMenu)} className={`w-24 h-24 rounded-full flex items-center justify-center text-black shadow-2xl transition-all duration-500 ${showActionMenu ? 'bg-white/10 rotate-45 text-white scale-90 shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-amber-500/50'}`}>
-              {showActionMenu ? <X size={40}/> : <Zap size={40} fill="currentColor" />}
+
+            <button 
+              onClick={() => setShowActionMenu(!showActionMenu)}
+              className={`w-20 h-20 rounded-full flex items-center justify-center text-black shadow-2xl transition-all duration-500 z-20 
+              ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-amber-500/40'}`}
+            >
+              {showActionMenu ? <X size={32} /> : <Zap size={32} fill="currentColor" />}
             </button>
           </div>
         )}
       </div>
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
