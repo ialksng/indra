@@ -390,7 +390,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
 
             <button 
               onClick={() => setShowActionMenu(!showActionMenu)}
-              className={`thunderbolt-main-btn ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-amber-500/40'}`}
+              // THE FIX: Changed shadow-amber-500/40 to shadow-lg shadow-amber-500/40
+              className={`thunderbolt-main-btn ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-lg shadow-amber-500/40'}`}
             >
               {showActionMenu ? <X size={32} /> : <Zap size={32} fill="currentColor" />}
             </button>
