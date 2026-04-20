@@ -26,9 +26,24 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // ⚡ NEW: Listen for pre-fill text from the host website (Gurukul)
+  useEffect(() => {
+    const handleWindowMsg = (e) => {
+      // Ensure we only listen to the specific PREFILL_MSG type
+      if (e.data && e.data.type === 'PREFILL_MSG') {
+        setInput(e.data.payload);
+        setShowTextInput(true); // Ensure the input box is visible
+      }
+    };
+
+    window.addEventListener('message', handleWindowMsg);
+    return () => window.removeEventListener('message', handleWindowMsg);
+  }, []);
 
   const models = [
     { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
@@ -43,7 +58,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   ];
 
   const handleMicClick = () => {
-    setShowTextInput(true); // FIX: Force input box to open immediately
+    setShowTextInput(true); 
     toggleRecording((transcript) => {
       setInput(prev => prev + (prev ? ' ' : '') + transcript);
     });
@@ -88,7 +103,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         const { value, done } = await reader.read();
         if (done) break;
         
-        // FIX: stream: true prevents broken JSON chunks
         const chunk = decoder.decode(value, { stream: true }); 
         const lines = chunk.split('\n');
         
@@ -99,7 +113,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               if (data.text) {
                 streamedText += data.text;
                 
-                // FIX: Immutable React State. This stops the "Hollow Dot" issue.
                 setMessages(prev => {
                   const updated = [...prev];
                   const lastIndex = updated.length - 1;
@@ -116,7 +129,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       speakText(streamedText);
     } catch (err) {
       console.error("Chat fetch error:", err);
-      // FIX: Replace the empty streaming dot with an actual error message
       setMessages(prev => {
         const updated = [...prev];
         const lastIndex = updated.length - 1;
@@ -328,7 +340,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
 
         {isInputModeActive ? (
           <div className="flex items-center gap-3 w-full max-w-4xl transition-all duration-300">
-            <button onClick={() => { setShowTextInput(false); stopVideo(); if(isRecording) toggleRecording(); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-gray-500">
+            <button onClick={() => { setShowTextInput(false); stopVideo(); if(isRecording) toggleRecording(); setInput(''); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-gray-500">
               <X size={20} />
             </button>
 
