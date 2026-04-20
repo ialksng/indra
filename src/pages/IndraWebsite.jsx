@@ -1,7 +1,41 @@
+import { useEffect } from 'react';
 import ChatCore from '../components/ChatCore';
 import { Bot, Settings, History, ArrowLeft } from 'lucide-react';
 
 export default function IndraWebsite() {
+  
+  useEffect(() => {
+    const handleActionMessage = (event) => {
+      const data = event.data;
+      if (data && data.type === 'INDRA_ACTION') {
+        const { action, selector, value } = data.payload;
+        console.log(`[Indra Site Agent] Executing: ${action} on ${selector}`);
+
+        try {
+          const element = document.querySelector(selector);
+          
+          if (!element) {
+            console.warn(`[Indra Site Agent] Element not found: ${selector}`);
+            return;
+          }
+
+          if (action === 'click') element.click();
+          if (action === 'navigate') window.location.href = value;
+          if (action === 'scroll') element.scrollIntoView({ behavior: 'smooth' });
+          if (action === 'fill') {
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        } catch (error) {
+          console.error('[Indra Site Agent] Action failed:', error);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleActionMessage);
+    return () => window.removeEventListener('message', handleActionMessage);
+  }, []);
+
   return (
     <div className="flex h-screen bg-black">
       <div className="hidden md:flex w-64 bg-slate-900 border-r border-slate-800 flex-col">
@@ -22,7 +56,11 @@ export default function IndraWebsite() {
           </button>
         </nav>
 
-        <a href="https://smartsphere.ialksng.me" className="m-4 flex items-center justify-center gap-2 p-3 text-gray-400 hover:text-white border border-slate-700 rounded-xl">
+        <a 
+          id="backtohubButton"
+          href="https://smartsphere.ialksng.me" 
+          className="m-4 flex items-center justify-center gap-2 p-3 text-gray-400 hover:text-white border border-slate-700 rounded-xl"
+        >
           <ArrowLeft size={18} /> Back to Hub
         </a>
       </div>

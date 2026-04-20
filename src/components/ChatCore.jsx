@@ -14,7 +14,6 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null); 
 
-  // --- SMARTSPHERE STATE ---
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultData, setVaultData] = useState('');
   
@@ -35,7 +34,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
   ];
 
-  const stopVideo = () => { /* ... existing stopVideo code ... */
+  const stopVideo = () => { /* ... existing ... */
     if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
@@ -43,7 +42,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setActiveVideoSource(null);
   };
 
-  const toggleCamera = async () => { /* ... existing toggleCamera code ... */
+  const toggleCamera = async () => { /* ... existing ... */
     if (activeVideoSource === 'camera') {
       stopVideo();
     } else {
@@ -59,7 +58,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   };
 
-  const toggleScreenShare = async () => { /* ... existing toggleScreenShare code ... */
+  const toggleScreenShare = async () => { /* ... existing ... */
     if (activeVideoSource === 'screen') {
       stopVideo();
     } else {
@@ -76,7 +75,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     }
   };
 
-  const captureVideoFrame = () => { /* ... existing captureVideoFrame code ... */
+  const captureVideoFrame = () => { /* ... existing ... */
     if (!activeVideoSource || !videoRef.current || !canvasRef.current) return null;
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -86,7 +85,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     return canvas.toDataURL('image/jpeg', 0.8);
   };
 
-  const handleDeviceUpload = (e) => { /* ... existing handleDeviceUpload code ... */
+  const handleDeviceUpload = (e) => { /* ... existing ... */
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -97,13 +96,12 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     reader.readAsDataURL(file);
   };
 
-  // --- SMARTSPHERE HANDLER ---
   const handleSmartSphereUpload = () => {
     setIsVaultOpen(true);
     setShowUploadMenu(false);
   };
 
-  const approveAction = (actionDetails, messageIndex) => { /* ... existing approveAction code ... */
+  const approveAction = (actionDetails, messageIndex) => {
     const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
     window.parent.postMessage({ type: 'INDRA_ACTION', payload: actionDetails }, targetOrigin);
     setMessages(prev => {
@@ -113,11 +111,55 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     });
   };
 
-  const denyAction = (messageIndex) => { /* ... existing denyAction code ... */
+  const denyAction = (messageIndex) => {
     setMessages(prev => {
       const newMessages = [...prev];
       newMessages[messageIndex].pendingAction.status = 'denied';
       return newMessages;
+    });
+  };
+
+  // --- NEW: DOM Map Fetcher ---
+  const fetchDomMap = () => {
+    return new Promise((resolve) => {
+      if (!automationEnabled) return resolve([]);
+
+      if (window.self !== window.top) {
+        // Embedded Widget Mode: Ask loader.js for the map
+        const handleMessage = (event) => {
+          if (event.data?.type === 'DOM_MAP_RESPONSE') {
+            window.removeEventListener('message', handleMessage);
+            resolve(event.data.payload);
+          }
+        };
+        window.addEventListener('message', handleMessage);
+        window.parent.postMessage({ type: 'REQUEST_DOM_MAP' }, '*');
+        
+        setTimeout(() => { // Fallback timeout
+          window.removeEventListener('message', handleMessage);
+          resolve([]);
+        }, 1000);
+      } else {
+        // Standalone Website Mode: Scrape directly
+        const elements = document.querySelectorAll('a, button, input, select, textarea');
+        const map = [];
+        let idCounter = 0;
+
+        elements.forEach((el) => {
+          if (el.closest('#indra-chat-core-container')) return; // Ignore chat UI
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) return;
+
+          const indraId = 'indra-standalone-' + (idCounter++);
+          el.setAttribute('data-indra-id', indraId);
+
+          let textContent = (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().substring(0, 50);
+          if (textContent) {
+            map.push({ type: el.tagName.toLowerCase(), text: textContent, selector: `[data-indra-id="${indraId}"]` });
+          }
+        });
+        resolve(map);
+      }
     });
   };
 
@@ -140,12 +182,16 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setIsLoading(true);
 
     try {
+      // Pause to collect the map of the current webpage
+      const currentDomMap = await fetchDomMap();
+
       const res = await apiClient.post('/chat', {
         message: textToSend,
         image: imageToSend,
         modelType: selectedModel,
         allowAutomation: automationEnabled,
-        vaultData: selectedModel === 'smartsphere-rag' ? vaultData : null, // --- INJECT VAULT DATA ---
+        domMap: currentDomMap, // --- SEND MAP TO BACKEND ---
+        vaultData: selectedModel === 'smartsphere-rag' ? vaultData : null,
         projectId,
         history: updatedMessages
       });
@@ -163,7 +209,8 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-slate-900 text-white relative">
+    // ADDED id="indra-chat-core-container" here
+    <div id="indra-chat-core-container" className="flex flex-col h-full w-full bg-slate-900 text-white relative">
       
       {/* --- SMARTSPHERE MODAL --- */}
       {isVaultOpen && (

@@ -48,6 +48,40 @@
 
     const data = event.data;
 
+    // --- NEW: Handle Request for DOM Map ---
+    if (data && data.type === 'REQUEST_DOM_MAP') {
+        const elements = document.querySelectorAll('a, button, input, select, textarea, [role="button"]');
+        const map = [];
+        let idCounter = 0;
+
+        elements.forEach((el) => {
+            // Ignore the widget itself
+            if (el.closest('#indra-widget-container')) return;
+            
+            // Ignore invisible elements
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+
+            // Inject an exact targeting ID
+            const indraId = 'indra-element-' + (idCounter++);
+            el.setAttribute('data-indra-id', indraId);
+
+            let textContent = (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().substring(0, 50);
+            if (!textContent && el.tagName === 'A') textContent = el.href;
+
+            if (textContent) {
+                map.push({
+                    type: el.tagName.toLowerCase(),
+                    text: textContent,
+                    selector: `[data-indra-id="${indraId}"]` // The exact selector the AI should use
+                });
+            }
+        });
+
+        // Send the map back to the iframe
+        iframe.contentWindow.postMessage({ type: 'DOM_MAP_RESPONSE', payload: map }, '*');
+    }
+
     if (data && data.type === 'INDRA_ACTION') {
       const { action, selector, value } = data.payload;
       console.log(`[Indra Agent] Executing: ${action} on ${selector}`);
@@ -73,7 +107,7 @@
             window.location.href = value;
             break;
           case 'scroll':
-            element.scrollIntoView({ behavior: 'smooth' });
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
             break;
           default:
             console.warn(`[Indra Agent] Unknown action: ${action}`);
