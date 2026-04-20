@@ -26,14 +26,17 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 🔥 UPDATED MODELS LIST TO MATCH BACKEND
   const models = [
-  { id: 'flash', name: 'Gemini 2.5 Flash' },
-  { id: 'pro', name: 'Gemini 2.5 Pro' },
-  { id: 'flash-lite', name: 'Gemini 2.5 Flash Lite' },
-  { id: 'groq-llama-3', name: 'Groq Llama-3.3 70B' },
-  { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B' },
-  { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
-];
+    { id: 'flash', name: '⚡ Gemini Flash (Fast)' },
+    { id: 'pro', name: '🧠 Gemini Pro (Complex)' },
+    { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
+    { id: 'deepseek', name: '🤔 DeepSeek R1 (Logic/Math)' },
+    { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
+    { id: 'groq-vision', name: '👁️ Llama Vision (Image Reader)' },
+    { id: 'image-generator', name: '🎨 Image Generator' },
+    { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
+  ];
 
   const stopVideo = () => { 
     if (videoRef.current && videoRef.current.srcObject) {
@@ -286,9 +289,10 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
           <ChevronDown size={16} className="absolute right-3 top-2.5 pointer-events-none text-gray-400" />
         </div>
 
-        {selectedModel.startsWith('groq') && (selectedImage || activeVideoSource) && (
+        {/* Updated safety check: Warns if image is attached but a text-only model is selected */}
+        {(selectedModel === 'groq-llama-3' || selectedModel === 'deepseek') && (selectedImage || activeVideoSource) && (
           <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-500/20">
-            <ShieldAlert size={12} /> Llama 3 is text-only
+            <ShieldAlert size={12} /> Model is text-only
           </div>
         )}
 
