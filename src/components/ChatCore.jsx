@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp } from 'lucide-react';
+import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Bot } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
 export default function ChatCore({ projectId = 'default', isCompact = false }) {
@@ -42,13 +42,14 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     } else {
       try {
         stopVideo();
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
         setActiveVideoSource('camera');
       } catch (err) {
-        console.error("Camera access denied", err);
-        alert("Please allow camera access.");
+        console.warn("Camera access denied or unavailable", err);
       }
     }
   };
@@ -60,15 +61,17 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       try {
         stopVideo();
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
         setActiveVideoSource('screen');
 
         stream.getVideoTracks()[0].onended = () => {
           stopVideo();
         };
       } catch (err) {
-        console.error("Screen share denied/cancelled", err);
+        console.warn("Screen share denied/cancelled", err);
       }
     }
   };
@@ -97,6 +100,28 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const handleSmartSphereUpload = () => {
     alert("Opening SmartSphere Vault...");
     setShowUploadMenu(false);
+  };
+
+  const approveAction = (actionDetails, messageIndex) => {
+    const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
+    window.parent.postMessage({
+      type: 'INDRA_ACTION',
+      payload: actionDetails
+    }, targetOrigin);
+
+    setMessages(prev => {
+      const newMessages = [...prev];
+      newMessages[messageIndex].pendingAction.status = 'approved';
+      return newMessages;
+    });
+  };
+
+  const denyAction = (messageIndex) => {
+    setMessages(prev => {
+      const newMessages = [...prev];
+      newMessages[messageIndex].pendingAction.status = 'denied';
+      return newMessages;
+    });
   };
 
   const handleSend = async (e) => {
@@ -133,15 +158,19 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
         history: updatedMessages
       });
 
+      const aiMessage = { 
+        role: 'ai', 
+        text: res.data.reply 
+      };
+
       if (res.data.actionInstruction) {
-        const targetOrigin = document.referrer ? new URL(document.referrer).origin : '*';
-        window.parent.postMessage({
-          type: 'INDRA_ACTION',
-          payload: res.data.actionInstruction
-        }, targetOrigin);
+        aiMessage.pendingAction = {
+          ...res.data.actionInstruction,
+          status: 'waiting' 
+        };
       }
 
-      setMessages(prev => [...prev, { role: 'ai', text: res.data.reply }]);
+      setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', text: 'Error connecting to Indra.' }]);
     } finally {
@@ -167,39 +196,72 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
 
       <div className={`flex-1 overflow-y-auto ${isCompact ? 'p-3 space-y-4' : 'p-6 space-y-6'}`}>
         {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`p-3 rounded-2xl max-w-[85%] ${msg.role === 'user' ? 'bg-purple-600' : 'bg-slate-800 border border-slate-700'}`}>
-              {msg.image && <img src={msg.image} className="rounded-lg mb-2 max-h-48 object-cover" alt="attachment"/>}
-              <p>{msg.text}</p>
+          <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+            
+            <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} max-w-[90%]`}>
+              {msg.role !== 'user' && !isCompact && <Bot className="text-purple-400 mt-1 shrink-0" size={20} />}
+              <div className={`p-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600' : 'bg-slate-800 border border-slate-700'}`}>
+                {msg.image && <img src={msg.image} className="rounded-lg mb-2 max-h-48 object-cover" alt="attachment"/>}
+                <p className={isCompact ? 'text-sm' : 'text-base'}>{msg.text}</p>
+              </div>
             </div>
+
+            {msg.pendingAction && (
+              <div className="ml-8 mt-1 p-3 bg-slate-800 border border-blue-500/50 rounded-xl max-w-[85%] flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-blue-400 text-sm font-semibold">
+                  <Bot size={16} /> Indra requests permission to:
+                </div>
+                <div className="bg-slate-900 p-2 rounded text-xs font-mono text-gray-300">
+                  <span className="text-purple-400">{msg.pendingAction.action.toUpperCase()}</span> on element <span className="text-emerald-400">"{msg.pendingAction.selector}"</span>
+                </div>
+                
+                {msg.pendingAction.status === 'waiting' && (
+                  <div className="flex gap-2 mt-1">
+                    <button 
+                      onClick={() => approveAction(msg.pendingAction, i)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded transition-colors"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => denyAction(i)}
+                      className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-2 rounded transition-colors"
+                    >
+                      Deny
+                    </button>
+                  </div>
+                )}
+                {msg.pendingAction.status === 'approved' && <span className="text-xs text-emerald-500 font-bold">✓ Action Executed</span>}
+                {msg.pendingAction.status === 'denied' && <span className="text-xs text-red-400 font-bold">✗ Action Denied</span>}
+              </div>
+            )}
+            
           </div>
         ))}
         {isLoading && <Loader2 className="animate-spin text-purple-400 m-4" size={20} />}
         <div ref={messagesEndRef} />
       </div>
 
-      {activeVideoSource && (
-        <div className={`p-2 bg-slate-800 border-t border-slate-700 flex justify-center ${activeVideoSource ? 'flex' : 'hidden'}`}>
-            <div className="relative rounded-lg overflow-hidden border-2 border-purple-500 max-w-full">
-            <video 
-                ref={videoRef} 
-                className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'transform scale-x-[-1]' : ''}`} 
-                muted 
-                playsInline 
-            />
-            <span className="absolute top-1 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">
-                {activeVideoSource === 'screen' ? 'SHARING SCREEN' : 'LIVE'}
-            </span>
-            <button 
-                onClick={stopVideo}
-                className="absolute top-1 right-2 bg-slate-900/80 p-1 rounded-full text-white hover:bg-red-500 transition-colors"
-            >
-                <X size={14} />
-            </button>
-            </div>
-            <canvas ref={canvasRef} className="hidden" />
+      <div className={`p-2 bg-slate-800 border-t border-slate-700 flex justify-center ${activeVideoSource ? 'flex' : 'hidden'}`}>
+        <div className="relative rounded-lg overflow-hidden border-2 border-purple-500 max-w-full">
+          <video 
+            ref={videoRef} 
+            className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'transform scale-x-[-1]' : ''}`} 
+            muted 
+            playsInline 
+          />
+          <span className="absolute top-1 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+            {activeVideoSource === 'screen' ? 'SHARING SCREEN' : 'LIVE'}
+          </span>
+          <button 
+            onClick={stopVideo}
+            className="absolute top-1 right-2 bg-slate-900/80 p-1 rounded-full text-white hover:bg-red-500 transition-colors"
+          >
+            <X size={14} />
+          </button>
         </div>
-      )}
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
 
       <div className="p-3 bg-slate-800/50 border-t border-slate-700 flex flex-col gap-2 relative">
         
