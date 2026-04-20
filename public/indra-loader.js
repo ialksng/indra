@@ -82,9 +82,22 @@
 
   // --- MESSAGE HUB ---
   window.addEventListener('message', (event) => {
-    if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost')) return;
+    // Note: Added gurukul.ialksng.me to the allowed origins list to ensure it can command the widget
+    if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost') && !event.origin.includes('gurukul.ialksng.me')) return;
 
     const { type, payload } = event.data;
+
+    // ⚡ NEW: Programmatically open the widget
+    if (type === 'OPEN_INDRA_WIDGET') {
+      if (!isOpen) {
+        button.click(); // Simulates a user clicking the toggle button
+      }
+    }
+
+    // ⚡ NEW: Forward pre-filled text straight into the widget iframe
+    if (type === 'PREFILL_INDRA') {
+      iframe.contentWindow.postMessage({ type: 'PREFILL_MSG', payload }, '*');
+    }
 
     if (type === 'REQUEST_DOM_MAP') {
       const elements = document.querySelectorAll('a, button, input, select, textarea, [role="button"]');
@@ -130,7 +143,7 @@
       }
     }
 
-    // New: Handle dynamic iframe resizing (e.g. for vault expansion)
+    // Handle dynamic iframe resizing
     if (type === 'SET_WIDGET_SIZE') {
         iframe.style.width = payload.width || '380px';
         iframe.style.height = payload.height || '600px';

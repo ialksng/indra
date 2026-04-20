@@ -1,58 +1,35 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ImagePlus, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, ShieldAlert, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
+import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
+import { useAudio } from '../hooks/useAudio';
+import { useMedia } from '../hooks/useMedia';
+import './ChatCore.css';
 
 export default function ChatCore({ projectId = 'default', _isCompact = false }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // UI states for the "Thunderbolt Action Hub"
+  // Custom Hooks
+  const { isRecording, voiceEnabled, setVoiceEnabled, toggleRecording, speakText, unlockAudio } = useAudio();
+  const { activeVideoSource, videoRef, canvasRef, stopVideo, toggleCamera, toggleScreenShare, captureVideoFrame } = useMedia();
+
+  // UI States
   const [selectedModel, setSelectedModel] = useState('flash');
   const [automationEnabled, setAutomationEnabled] = useState(false); 
-  const [voiceEnabled, setVoiceEnabled] = useState(false); 
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
-
-  const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null); 
-  const [isRecording, setIsRecording] = useState(false);
-
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultData, setVaultData] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(null); 
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const recognitionRef = useRef(null);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Speech-to-Text Initialization
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev + (prev ? ' ' : '') + transcript);
-        setIsRecording(false);
-        setShowTextInput(true); // Switch to input mode so user can see/edit
-      };
-      
-      recognitionRef.current.onerror = () => setIsRecording(false);
-      recognitionRef.current.onend = () => setIsRecording(false);
-    }
-  }, []);
-
-  // ALL POSSIBLE FREE MODELS
   const models = [
     { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
     { id: 'flash-lite', name: '🍃 Gemini Flash Lite' },
@@ -60,89 +37,23 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
     { id: 'deepseek', name: '🤔 DeepSeek R1 (Math/Logic)' },
     { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
-    { id: 'groq-vision', name: '👁️ Llama Vision (Image Reader)' },
-    { id: 'or-mistral', name: '🌪️ Mistral 7B' },
-    { id: 'or-gemma', name: '💎 Google Gemma 9B' },
-    { id: 'or-phi', name: '🔬 Microsoft Phi-3' },
-    { id: 'or-qwen', name: '🐉 Alibaba Qwen 7B' },
+    { id: 'groq-vision', name: '👁️ Llama Vision' },
     { id: 'image-generator', name: '🎨 Image Generator' },
     { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
   ];
 
-  // --- VOICE & IMAGE UTILS ---
-
-  const toggleRecording = () => {
-    // Check for browser support
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("Speech recognition is not supported in this browser.");
-
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-    } else {
-      // Re-initialize to ensure it's fresh
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = 'en-US';
-      recognitionRef.current.interimResults = false;
-
-      recognitionRef.current.onstart = () => setIsRecording(true);
-      
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev + (prev ? ' ' : '') + transcript);
-        setShowTextInput(true); // Switch to input mode so user sees the text
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech Error:", event.error);
-        setIsRecording(false);
-      };
-
-      recognitionRef.current.onend = () => setIsRecording(false);
-
-      recognitionRef.current.start();
-    }
+  const handleMicClick = () => {
+    setShowTextInput(true); // FIX: Force input box to open immediately
+    toggleRecording((transcript) => {
+      setInput(prev => prev + (prev ? ' ' : '') + transcript);
+    });
   };
-
-  const speakText = (text) => {
-    if (!voiceEnabled || !window.speechSynthesis) return;
-
-    // 1. Cancel any current speaking queue
-    window.speechSynthesis.cancel(); 
-
-    // 2. Clean markdown/links so the AI doesn't read URLs out loud
-    const cleanText = text
-      .replace(/!\[.*?\]\((.*?)\)/g, 'Here is the image you requested.')
-      .replace(/[#*_~`]/g, '');
-
-    // Wait a tiny fraction of a second after cancel before speaking again
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      
-      // 3. Set a more natural voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Female'));
-      if (preferredVoice) utterance.voice = preferredVoice;
-
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  };
-
-  // --- UNIFIED HANDLE SEND ---
 
   const handleSend = async (e) => {
     e?.preventDefault();
     if (isLoading || (!input.trim() && !selectedImage && !activeVideoSource)) return;
 
-    // IMPORTANT: Trigger a silent speech start synchronously on click
-    // This unlocks the browser's audio permissions for the delayed AI reply.
-    if (voiceEnabled && window.speechSynthesis) {
-      const unlocker = new SpeechSynthesisUtterance("");
-      window.speechSynthesis.speak(unlocker);
-    }
+    unlockAudio(); 
 
     let imageToSend = selectedImage;
     if (activeVideoSource) imageToSend = captureVideoFrame();
@@ -151,7 +62,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
     
-    // Clear inputs and reset UI
     const messagePayload = input;
     setInput('');
     setSelectedImage(null);
@@ -159,23 +69,16 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     if (activeVideoSource) stopVideo();
 
     try {
-      // Add empty AI message placeholder
       setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/indra/chat`, {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messagePayload,
-          image: imageToSend,
-          modelType: selectedModel,
-          allowAutomation: automationEnabled,
-          history: messages,
-          projectId
-        })
+        body: JSON.stringify({ message: messagePayload, image: imageToSend, modelType: selectedModel, allowAutomation: automationEnabled, history: messages, projectId })
       });
 
-      if (!response.body) throw new Error("ReadableStream not supported.");
+      if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -185,7 +88,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         const { value, done } = await reader.read();
         if (done) break;
         
-        const chunk = decoder.decode(value);
+        // FIX: stream: true prevents broken JSON chunks
+        const chunk = decoder.decode(value, { stream: true }); 
         const lines = chunk.split('\n');
         
         for (const line of lines) {
@@ -194,31 +98,39 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               const data = JSON.parse(line.substring(6));
               if (data.text) {
                 streamedText += data.text;
+                
+                // FIX: Immutable React State. This stops the "Hollow Dot" issue.
                 setMessages(prev => {
                   const updated = [...prev];
-                  const lastMsg = updated[updated.length - 1];
-                  if (lastMsg && lastMsg.role === 'ai') {
-                    lastMsg.text = streamedText;
+                  const lastIndex = updated.length - 1;
+                  if (updated[lastIndex] && updated[lastIndex].role === 'ai') {
+                    updated[lastIndex] = { ...updated[lastIndex], text: streamedText };
                   }
                   return updated;
                 });
               }
-            } catch (_e) { /* partial chunk */ }
+            } catch (_e) {}
           }
         }
       }
-
-      // Speak the accumulated text once streaming finishes
       speakText(streamedText);
-
     } catch (err) {
-      console.error(err);
-      setMessages(prev => [...prev, { role: 'ai', text: 'Connection failed.' }]);
+      console.error("Chat fetch error:", err);
+      // FIX: Replace the empty streaming dot with an actual error message
+      setMessages(prev => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex] && updated[lastIndex].isStreaming) {
+          updated[lastIndex] = { ...updated[lastIndex], text: 'Connection failed. Check backend.', isStreaming: false };
+        }
+        return updated;
+      });
     } finally {
       setIsLoading(false);
       setMessages(prev => {
         const updated = [...prev];
-        if (updated[updated.length - 1]) updated[updated.length - 1].isStreaming = false;
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex]) updated[lastIndex].isStreaming = false;
         return updated;
       });
     }
@@ -250,6 +162,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   };
 
   const renderMessageText = (text) => {
+    if (!text) return "";
     const imgRegex = /!\[.*?\]\((.*?)\)/g;
     const parts = [];
     let lastIndex = 0;
@@ -276,57 +189,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     return parts.length > 0 ? parts : text;
   };
 
-  // --- CAMERA / SCREEN / FILE HANDLERS ---
-
-  const stopVideo = () => { 
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setActiveVideoSource(null);
-  };
-
-  const toggleCamera = async () => { 
-    if (activeVideoSource === 'camera') stopVideo();
-    else {
-      try {
-        stopVideo();
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-        setActiveVideoSource('camera');
-      } catch (_err) { console.warn("Camera denied."); }
-    }
-  };
-
-  const toggleScreenShare = async () => { 
-    if (activeVideoSource === 'screen') stopVideo();
-    else {
-      try {
-        stopVideo();
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-        setActiveVideoSource('screen');
-        stream.getVideoTracks()[0].onended = () => stopVideo();
-      } catch (_err) { console.warn("Screen share denied."); }
-    }
-  };
-
-  const captureVideoFrame = () => { 
-    if (!activeVideoSource || !videoRef.current || !canvasRef.current) return null;
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.8);
-  };
-
   const handleDeviceUpload = (e) => { 
     const file = e.target.files[0];
     if (!file) return;
@@ -334,7 +196,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     reader.onloadend = () => {
       setSelectedImage(reader.result);
       setShowActionMenu(false);
-      setShowTextInput(true); // Jump into input mode
+      setShowTextInput(true); 
     };
     reader.readAsDataURL(file);
   };
@@ -342,22 +204,22 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const isInputModeActive = showTextInput || isRecording || activeVideoSource || selectedImage;
 
   return (
-    <div id="indra-chat-core-container" className="flex flex-col h-full w-full relative z-10 bg-[#0b0f1a] text-slate-200">
+    <div id="indra-chat-core-container" className="chat-core-wrapper">
       
-      {/* MODAL: IMAGE SAVE OPTIONS */}
+      {/* MODALS */}
       {showSaveDialog && (
-        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[#0f172a] border border-amber-500/20 rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl">
+        <div className="modal-overlay">
+          <div className="modal-box w-full max-w-sm">
             <div className="flex justify-between items-center">
               <h3 className="text-amber-400 font-bold tracking-wide">SAVE GENERATED IMAGE</h3>
               <button onClick={() => setShowSaveDialog(null)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
             <img src={showSaveDialog} className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
             <div className="flex flex-col gap-2">
-              <button onClick={() => downloadToDevice(showSaveDialog)} className="flex items-center justify-center gap-3 bg-amber-500 text-black py-3 rounded-xl font-bold hover:bg-amber-400 transition-all shadow-lg">
+              <button onClick={() => downloadToDevice(showSaveDialog)} className="btn-primary">
                 <Download size={18} /> Download to Device
               </button>
-              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="flex items-center justify-center gap-3 bg-white/5 text-white py-3 rounded-xl font-bold hover:bg-white/10 transition-all border border-white/10">
+              <button onClick={() => saveToSmartSphere(showSaveDialog)} className="btn-secondary">
                 <Cloud size={18} /> Save to SmartSphere
               </button>
             </div>
@@ -365,14 +227,11 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         </div>
       )}
 
-      {/* SMARTSPHERE MODAL */}
       {isVaultOpen && (
-        <div className="absolute inset-0 bg-black/80 z-40 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[#0f172a] border border-amber-500/20 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
+        <div className="modal-overlay">
+          <div className="modal-box w-full max-w-md">
             <div className="flex justify-between items-center">
-              <h3 className="text-amber-400 font-bold flex items-center gap-2">
-                <Database size={16}/> SMARTSPHERE VAULT
-              </h3>
+              <h3 className="text-amber-400 font-bold flex items-center gap-2"><Database size={16}/> SMARTSPHERE VAULT</h3>
               <button onClick={() => setIsVaultOpen(false)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
             <textarea
@@ -387,7 +246,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       )}
 
       {/* HEADER */}
-      <div className="p-3 bg-black/40 border-b border-white/5 flex flex-wrap gap-3 justify-between items-center z-20 backdrop-blur-md">
+      <div className="chat-header-bar">
         <div className="relative group flex-1 min-w-[150px] max-w-[220px]">
           <select 
             value={selectedModel}
@@ -419,7 +278,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       </div>
 
       {/* CHAT MESSAGES */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 chat-scroll-area">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 opacity-40">
             <Zap className="text-amber-500 mb-4" size={48} fill="currentColor" />
@@ -431,7 +290,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         {messages.map((msg, i) => (
           <div key={i} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} max-w-[90%]`}>
-              <div className={`p-4 rounded-2xl shadow-xl ${msg.role === 'user' ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-black font-semibold' : 'bg-white/5 border border-white/10 text-slate-200'}`}>
+              <div className={msg.role === 'user' ? 'msg-bubble-user' : 'msg-bubble-ai'}>
                 {msg.image && <img src={msg.image} className="rounded-xl mb-3 max-h-48 object-cover border border-white/10 shadow-lg" alt="upload"/>}
                 <div className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
                    {renderMessageText(msg.text)}
@@ -454,9 +313,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       </div>
 
       {/* --- CENTRAL THUNDERBOLT ACTION HUB --- */}
-      <div className="p-6 bg-black/20 border-t border-white/10 flex flex-col items-center justify-center relative min-h-[100px]">
+      <div className="action-hub-container">
         
-        {/* Attachment Preview */}
         {selectedImage && (
           <div className="absolute -top-16 left-6 bg-[#0f172a] p-1.5 rounded-xl border border-white/10 shadow-2xl z-10 animate-in fade-in slide-in-from-bottom-2">
             <div className="relative">
@@ -469,9 +327,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} className="hidden" />
 
         {isInputModeActive ? (
-          // --- INPUT BOX MODE ---
           <div className="flex items-center gap-3 w-full max-w-4xl transition-all duration-300">
-            <button onClick={() => { setShowTextInput(false); if (isRecording) toggleRecording(); stopVideo(); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-gray-500 transition-colors">
+            <button onClick={() => { setShowTextInput(false); stopVideo(); if(isRecording) toggleRecording(); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-gray-500">
               <X size={20} />
             </button>
 
@@ -480,51 +337,48 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={isRecording ? "Listening..." : "Type your command..."}
-              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all shadow-2xl placeholder:text-gray-600"
+              className="chat-input-field"
               autoFocus
             />
             
-            <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage)} className="p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all">
+            <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage && !activeVideoSource)} className="send-btn">
               <Send size={22} />
             </button>
           </div>
         ) : (
-          // --- THUNDERBOLT HUB MODE ---
           <div className="flex justify-center items-center w-full relative">
-            
             {showActionMenu && (
-              <div className="absolute bottom-24 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-2xl p-4 rounded-[40px] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.8)] w-[95%] max-w-[360px] animate-in fade-in zoom-in-95 duration-200">
-                <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+              <div className="action-menu-popup">
+                <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="action-icon-btn">
                   <Search size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="text-[9px] font-black tracking-widest text-gray-500">SEARCH</span>
+                  <span className="action-icon-text">SEARCH</span>
                 </button>
-                <button onClick={() => { toggleRecording(); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                <button onClick={() => { handleMicClick(); setShowActionMenu(false); }} className="action-icon-btn">
                   <Mic size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="text-[9px] font-black tracking-widest text-gray-500">VOICE</span>
+                  <span className="action-icon-text">VOICE</span>
                 </button>
-                <button onClick={() => { toggleCamera(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                <button onClick={() => { toggleCamera(); setShowTextInput(true); setShowActionMenu(false); }} className="action-icon-btn">
                   <Camera size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="text-[9px] font-black tracking-widest text-gray-500">CAMERA</span>
+                  <span className="action-icon-text">CAMERA</span>
                 </button>
-                <button onClick={() => { toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                <button onClick={() => { toggleScreenShare(); setShowTextInput(true); setShowActionMenu(false); }} className="action-icon-btn">
                   <MonitorUp size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="text-[9px] font-black tracking-widest text-gray-500">PRESENT</span>
+                  <span className="action-icon-text">PRESENT</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                <button onClick={() => fileInputRef.current?.click()} className="action-icon-btn">
                   <HardDrive size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="text-[9px] font-black tracking-widest text-gray-500">DEVICE</span>
+                  <span className="action-icon-text">DEVICE</span>
                 </button>
-                <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group">
+                <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="action-icon-btn">
                   <Database size={24} className="group-hover:text-amber-400 group-hover:scale-110 transition-all"/>
-                  <span className="text-[9px] font-black tracking-widest text-gray-500">VAULT</span>
+                  <span className="action-icon-text">VAULT</span>
                 </button>
               </div>
             )}
 
             <button 
               onClick={() => setShowActionMenu(!showActionMenu)}
-              className={`w-20 h-20 rounded-full flex items-center justify-center text-black shadow-2xl transition-all duration-500 z-20 
-              ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-amber-500/40'}`}
+              className={`thunderbolt-main-btn ${showActionMenu ? 'bg-white/10 rotate-45 text-white shadow-none' : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:scale-110 shadow-amber-500/40'}`}
             >
               {showActionMenu ? <X size={32} /> : <Zap size={32} fill="currentColor" />}
             </button>

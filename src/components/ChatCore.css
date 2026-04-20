@@ -1,0 +1,72 @@
+/* src/components/ChatCore.css */
+
+/* Custom Scrollbar for Chat Area */
+.chat-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.5) transparent;
+}
+.chat-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll-area::-webkit-scrollbar-thumb {
+  background-color: rgba(245, 158, 11, 0.5);
+  border-radius: 10px;
+}
+
+/* --- Layout & Core --- */
+.chat-core-wrapper {
+  @apply flex flex-col h-full w-full relative z-10 bg-[#0b0f1a] text-slate-200;
+}
+.chat-header-bar {
+  @apply p-3 bg-black/40 border-b border-white/5 flex flex-wrap gap-3 justify-between items-center z-20 backdrop-blur-md;
+}
+
+/* --- Modals --- */
+.modal-overlay {
+  @apply absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm;
+}
+.modal-box {
+  @apply bg-[#0f172a] border border-amber-500/20 rounded-2xl p-6 flex flex-col gap-4 shadow-2xl;
+}
+
+/* --- Buttons & Inputs --- */
+.btn-primary {
+  @apply flex items-center justify-center gap-3 bg-amber-500 text-black py-3 rounded-xl font-bold hover:bg-amber-400 transition-all shadow-lg;
+}
+.btn-secondary {
+  @apply flex items-center justify-center gap-3 bg-white/5 text-white py-3 rounded-xl font-bold hover:bg-white/10 transition-all border border-white/10;
+}
+.chat-input-field {
+  @apply flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-amber-500 focus:bg-white/10 text-white transition-all shadow-2xl placeholder:text-gray-600;
+}
+.send-btn {
+  @apply p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all;
+}
+
+/* --- Message Bubbles --- */
+.msg-bubble-user {
+  @apply p-4 rounded-2xl shadow-xl bg-gradient-to-br from-amber-500 to-orange-500 text-black font-semibold;
+}
+.msg-bubble-ai {
+  @apply p-4 rounded-2xl shadow-xl bg-white/5 border border-white/10 text-slate-200;
+}
+
+/* --- Thunderbolt Action Hub --- */
+.action-hub-container {
+  @apply p-6 bg-black/20 border-t border-white/10 flex flex-col items-center justify-center relative min-h-[100px];
+}
+.action-menu-popup {
+  @apply absolute bottom-24 flex flex-wrap justify-center gap-2 bg-[#0f172a]/95 backdrop-blur-2xl p-4 rounded-[40px] border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.8)] w-[95%] max-w-[360px] animate-in fade-in zoom-in-95 duration-200;
+}
+.action-icon-btn {
+  @apply flex flex-col items-center justify-center gap-2 p-4 w-[100px] hover:bg-white/5 rounded-[30px] transition-all group;
+}
+.action-icon-text {
+  @apply text-[9px] font-black tracking-widest text-gray-500;
+}
+.thunderbolt-main-btn {
+  @apply w-20 h-20 rounded-full flex items-center justify-center text-black shadow-2xl transition-all duration-500 z-20;
+}
