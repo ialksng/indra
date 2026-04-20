@@ -105,15 +105,26 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     setShowUploadMenu(false);
   };
 
-  // --- UPDATED: Chrome Extension Action Execution ---
+  // --- UPDATED: Chrome Extension Action Execution with Safety Checks ---
   const approveAction = (actionDetails, messageIndex) => {
     // 1. Try Chrome Extension execution
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { 
+        const activeTab = tabs[0];
+        if (activeTab?.id) {
+          // Check for forbidden URLs before executing
+          if (activeTab.url && (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('edge://') || activeTab.url.startsWith('about:'))) {
+            console.warn("[Indra] Cannot execute actions on internal browser pages.");
+            return;
+          }
+
+          chrome.tabs.sendMessage(activeTab.id, { 
             type: 'EXECUTE_ACTION', 
             payload: actionDetails 
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.warn("[Indra] Execution failed. Content script not found.");
+            }
           });
         }
       });
@@ -138,7 +149,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
     });
   };
 
-  // --- UPDATED: Chrome Extension DOM Fetcher ---
+  // --- UPDATED: Chrome Extension DOM Fetcher with Defensive Programming ---
   const fetchDomMap = () => {
     return new Promise((resolve) => {
       if (!automationEnabled) return resolve([]);
@@ -146,13 +157,23 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
       // 1. Try fetching via Chrome Extension API (Real-time active tab)
       if (typeof chrome !== 'undefined' && chrome.tabs) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (!tabs[0]?.id) return resolve([]);
+          const activeTab = tabs[0];
+          if (!activeTab?.id) return resolve([]);
           
-          chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_LIVE_CONTEXT' }, (response) => {
-            if (chrome.runtime.lastError || !response) {
-               console.warn("Could not reach active page via Chrome API.", chrome.runtime.lastError);
+          // CRITICAL FIX: Do not attempt to inject or message forbidden Chrome pages
+          if (activeTab.url && (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('edge://') || activeTab.url.startsWith('about:'))) {
+            console.warn("[Indra] Cannot run Web Agent on internal browser pages.");
+            return resolve([]); // Gracefully return empty map
+          }
+
+          chrome.tabs.sendMessage(activeTab.id, { type: 'GET_LIVE_CONTEXT' }, (response) => {
+            // Handle the "Receiving end does not exist" error silently
+            if (chrome.runtime.lastError) {
+               console.warn("[Indra] Content script not found. Did you refresh the page?");
                return resolve([]);
             }
+            if (!response) return resolve([]);
+
             console.log("Real-time map from active tab:", response.map);
             resolve(response.map);
           });
