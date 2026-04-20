@@ -7,7 +7,7 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash');
+  const [selectedModel, setSelectedModel] = useState('flash');
   const [automationEnabled, setAutomationEnabled] = useState(false); 
   
   const [showUploadMenu, setShowUploadMenu] = useState(false);
@@ -27,12 +27,13 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   }, [messages]);
 
   const models = [
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-    { id: 'groq-llama-3', name: 'Groq Llama-3.3 70B' },
-    { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B' },
-    { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
-  ];
+  { id: 'flash', name: 'Gemini 2.5 Flash' },
+  { id: 'pro', name: 'Gemini 2.5 Pro' },
+  { id: 'flash-lite', name: 'Gemini 2.5 Flash Lite' },
+  { id: 'groq-llama-3', name: 'Groq Llama-3.3 70B' },
+  { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B' },
+  { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
+];
 
   const stopVideo = () => { 
     if (videoRef.current && videoRef.current.srcObject) {
