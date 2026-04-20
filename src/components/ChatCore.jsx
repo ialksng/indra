@@ -27,8 +27,8 @@ export default function ChatCore({ projectId = 'default', isCompact = false }) {
   const models = [
     { id: 'gemini-flash', name: 'Gemini 1.5 Flash' },
     { id: 'gemini-pro', name: 'Gemini 1.5 Pro' },
-    { id: 'groq-llama-3', name: 'Groq Llama-3 70B (Fast)' },
-    { id: 'groq-mixtral', name: 'Groq Mixtral' },
+    { id: 'groq-llama-3', name: 'Groq Llama-3.3 70B' },
+    { id: 'groq-mixtral', name: 'Groq Llama-3.1 8B (Fast)' }, // Updated label
     { id: 'smartsphere-rag', name: 'SmartSphere (My Data)' }
   ];
 
