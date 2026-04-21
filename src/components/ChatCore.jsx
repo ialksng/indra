@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
+import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search, Command } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 import { useMedia } from '../hooks/useMedia';
 
@@ -7,6 +7,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false); // Tracks live browser automation
   
   // Custom Hooks
   const { isRecording, voiceEnabled, setVoiceEnabled, toggleRecording, speakText, unlockAudio } = useAudio();
@@ -39,25 +40,51 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         setShowTextInput(true); 
       }
     };
-
     window.addEventListener('message', handleWindowMsg);
     return () => window.removeEventListener('message', handleWindowMsg);
   }, []);
 
-  // ⚡ UPGRADED: Real-Time Live Vision Loop (Supports Camera AND Screen Share)
+  // ⚡ CHROME EXTENSION HELPERS
+  const getActiveTabContext = async () => {
+    if (!window.chrome || !chrome.tabs) return null;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) return null;
+      return await chrome.tabs.sendMessage(tab.id, { type: 'GET_LIVE_CONTEXT' });
+    } catch (e) {
+      console.warn("Chrome Extension context not available. Are you running this as an extension?");
+      return null;
+    }
+  };
+
+  const executeWebAction = async (actionData) => {
+    if (!window.chrome || !chrome.tabs) return false;
+    try {
+      setIsExecuting(true);
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        await chrome.tabs.sendMessage(tab.id, { type: 'EXECUTE_ACTION', payload: actionData });
+      }
+      return true;
+    } catch (e) {
+      console.error("Failed to execute action", e);
+      return false;
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // ⚡ LIVE VISION LOOP
   useEffect(() => {
     let isProcessing = false;
 
     if (activeVideoSource === 'camera' || activeVideoSource === 'screen') {
-      // Auto-enable voice so the AI can speak what it sees
       setVoiceEnabled(true); 
 
-      // Adjust prompt based on what we are looking at
       const backgroundPrompt = activeVideoSource === 'camera'
         ? "Identify the main object in this image. Reply with ONLY 1 to 4 words. No markdown, no extra text."
         : "Briefly state what is open on this screen. Reply with ONLY 1 to 6 words. No markdown, no extra text.";
 
-      // Every 5 seconds, capture a frame and ask AI what it is silently
       visionIntervalRef.current = setInterval(async () => {
         if (isProcessing) return;
         
@@ -73,9 +100,9 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
             body: JSON.stringify({ 
               message: backgroundPrompt, 
               image: frame, 
-              modelType: 'flash', // Fast vision model
+              modelType: 'flash', 
               allowAutomation: false,
-              history: [], // Do not pollute chat history with background scanning
+              history: [], 
               projectId 
             })
           });
@@ -105,7 +132,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               }
             }
             
-            // Speak the detected object/screen content if voice is enabled
             if (finalAnswer.trim()) {
               const prefix = activeVideoSource === 'camera' ? "I see " : "You are looking at ";
               speakText(`${prefix} ${finalAnswer.trim().replace(/[*#.`]/g, '')}`);
@@ -116,7 +142,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         } finally {
           isProcessing = false;
         }
-      }, 5000); // 5000ms = 5 seconds. You can increase this to 7000 if it talks too much.
+      }, 5000); 
     }
 
     return () => {
@@ -160,6 +186,12 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     let imageToSend = selectedImage;
     if (activeVideoSource) imageToSend = captureVideoFrame();
 
+    // ⚡ AUTOMATION SYNC: Grab DOM map before sending to AI
+    let livePageContext = null;
+    if (automationEnabled) {
+       livePageContext = await getActiveTabContext();
+    }
+
     const userMsg = { role: 'user', text: textToSend, image: imageToSend };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
@@ -176,7 +208,15 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       const response = await fetch(`${baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: textToSend, image: imageToSend, modelType: selectedModel, allowAutomation: automationEnabled, history: messages, projectId })
+        body: JSON.stringify({ 
+          message: textToSend, 
+          image: imageToSend, 
+          modelType: selectedModel, 
+          allowAutomation: automationEnabled,
+          pageContext: livePageContext, // Tells AI what buttons/inputs are visible
+          history: messages, 
+          projectId 
+        })
       });
 
       if (!response.ok) throw new Error(`Server Error: ${response.status}`);
@@ -192,7 +232,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         
         buffer += decoder.decode(value, { stream: true }); 
         const lines = buffer.split('\n');
-        
         buffer = lines.pop() || '';
         
         for (const line of lines) {
@@ -206,6 +245,19 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               if (data.text) {
                 streamedText += data.text;
                 
+                // ⚡ ACTION INTERCEPTOR: Execute code mid-stream
+                if (automationEnabled && streamedText.includes('<<<EXECUTE:')) {
+                  const match = streamedText.match(/<<<EXECUTE:(.*?)>>>/);
+                  if (match && match[1]) {
+                     try {
+                        const actionPayload = JSON.parse(match[1]);
+                        await executeWebAction(actionPayload);
+                        // Clean output for the user
+                        streamedText = streamedText.replace(match[0], '\n⚡ *Action Executed*');
+                     } catch(err) { console.error("Action parse failed", err); }
+                  }
+                }
+
                 setMessages(prev => {
                   const updated = [...prev];
                   const lastIndex = updated.length - 1;
@@ -427,10 +479,11 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
           </div>
         ))}
         {isLoading && !messages[messages.length-1]?.isStreaming && <Loader2 className="animate-spin text-amber-500 mx-auto" size={24} />}
+        {isExecuting && <div className="flex justify-center text-[10px] text-amber-500 font-bold animate-pulse mt-2">EXECUTING BROWSER ACTION...</div>}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ⚡ UPGRADED: LIVE VIDEO PREVIEW WITH VISION BADGE FOR BOTH CAMERA & SCREEN */}
+      {/* ⚡ LIVE VIDEO PREVIEW */}
       <div className={`p-2 bg-black/40 border-t border-white/10 flex justify-center backdrop-blur-md ${activeVideoSource ? 'flex' : 'hidden'}`}>
         <div className="relative rounded-xl overflow-hidden border-2 border-amber-500/30 shadow-2xl">
           {(activeVideoSource === 'camera' || activeVideoSource === 'screen') && (
