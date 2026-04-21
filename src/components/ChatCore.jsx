@@ -3,7 +3,7 @@ import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePoi
 import './ChatCore.css'; 
 
 export default function ChatCore() {
-  // Pure UI State
+  // Pure UI State (No Backend Logic)
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('smart'); 
@@ -27,12 +27,13 @@ export default function ChatCore() {
     e?.preventDefault();
     if (!input.trim() && !selectedImage && !activeVideoSource) return;
     
+    // Visually add user message, clear inputs
     setMessages(prev => [...prev, { role: 'user', text: input, image: selectedImage }]);
     setInput('');
     setSelectedImage(null);
     setShowTextInput(false);
     setActiveVideoSource(null);
-    setIsLoading(true); 
+    setIsLoading(true); // Toggle loading state visually
   };
 
   const handleDeviceUpload = (e) => { 
@@ -93,6 +94,8 @@ export default function ChatCore() {
 
       {/* HEADER */}
       <div className="indra-header">
+        
+        {/* 3-Way Toggle */}
         <div className="indra-model-toggle">
           {['lite', 'smart', 'ultra'].map((mode) => (
             <button
@@ -116,7 +119,7 @@ export default function ChatCore() {
           <label className="indra-agent-toggle">
             <input type="checkbox" checked={automationEnabled} onChange={(e) => setAutomationEnabled(e.target.checked)} style={{ display: 'none' }} />
             <MousePointerClick size={16} color={automationEnabled ? '#fbbf24' : '#6b7280'} />
-            <span className="indra-agent-text text-[10px] font-bold hidden sm:block">AGENT</span>
+            <span className="indra-agent-text">AGENT</span>
             <div className={`indra-switch ${automationEnabled ? 'active' : ''}`}>
               <div className="indra-switch-thumb" />
             </div>
@@ -171,7 +174,7 @@ export default function ChatCore() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ⚡ LIVE VIDEO PREVIEW */}
+      {/* ⚡ LIVE VIDEO PREVIEW (Dumb Shell) */}
       <div className="indra-video-panel" style={{ display: activeVideoSource ? 'flex' : 'none' }}>
         <div className="indra-video-wrapper">
           <div className="indra-video-tag">
@@ -215,26 +218,27 @@ export default function ChatCore() {
             </div>
             
             <button onClick={(e) => handleSend(e)} disabled={isLoading || (!input.trim() && !selectedImage && !activeVideoSource)} className="indra-send-btn">
-              <Send size={22} />
+              <Send size={20} />
             </button>
           </div>
         ) : (
           <div className="indra-center-hub">
-            {/* ⚡ PREMIUM EXPANDING DOCK */}
+            
+            {/* ⚡ COMPACT EXPANDING DOCK */}
             <div className={`indra-action-dock ${showActionMenu ? 'open' : ''}`}>
               
               {/* Left Icons */}
               <div className="indra-dock-side left">
                 <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Search size={22} className="indra-menu-item-icon"/>
+                  <Search size={18} className="indra-menu-item-icon"/>
                   <span>SEARCH</span>
                 </button>
                 <button onClick={() => { setShowTextInput(true); setVoiceEnabled(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Mic size={22} className="indra-menu-item-icon"/>
+                  <Mic size={18} className="indra-menu-item-icon"/>
                   <span>VOICE</span>
                 </button>
                 <button onClick={() => { setActiveVideoSource('camera'); setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Camera size={22} className="indra-menu-item-icon"/>
+                  <Camera size={18} className="indra-menu-item-icon"/>
                   <span>CAMERA</span>
                 </button>
               </div>
@@ -245,19 +249,18 @@ export default function ChatCore() {
               {/* Right Icons */}
               <div className="indra-dock-side right">
                 <button onClick={() => { setActiveVideoSource('screen'); setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <MonitorUp size={22} className="indra-menu-item-icon"/>
+                  <MonitorUp size={18} className="indra-menu-item-icon"/>
                   <span>PRESENT</span>
                 </button>
                 <button onClick={() => { fileInputRef.current?.click(); setShowActionMenu(false); }} className="indra-menu-item">
-                  <HardDrive size={22} className="indra-menu-item-icon"/>
+                  <HardDrive size={18} className="indra-menu-item-icon"/>
                   <span>DEVICE</span>
                 </button>
                 <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Database size={22} className="indra-menu-item-icon"/>
+                  <Database size={18} className="indra-menu-item-icon"/>
                   <span>VAULT</span>
                 </button>
               </div>
-
             </div>
 
             {/* Main Center Button */}
@@ -265,7 +268,7 @@ export default function ChatCore() {
               onClick={() => setShowActionMenu(!showActionMenu)}
               className={`indra-thunder-btn ${showActionMenu ? 'open' : ''}`}
             >
-              {showActionMenu ? <X size={32} /> : <Zap size={32} fill="currentColor" />}
+              {showActionMenu ? <X size={24} /> : <Zap size={24} fill="currentColor" />}
             </button>
           </div>
         )}
