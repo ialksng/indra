@@ -47,12 +47,12 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   // ⚡ UPDATED: Syncing UI labels with the new backend models
   const models = [
     { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
-    { id: 'flash-lite', name: '🍃 Gemini 1.5 Flash (Latest)' },
-    { id: 'pro', name: '🧠 Gemini 1.5 Pro (Latest)' },
+    { id: 'flash-lite', name: '🍃 Gemini 1.5 Flash' },
+    { id: 'pro', name: '🧠 Gemini 1.5 Pro' },
     { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
     { id: 'deepseek', name: '🤔 DeepSeek R1 (OpenRouter)' },
     { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B (Groq)' },
-    { id: 'groq-vision', name: '👁️ Llama 3.2 90B Vision' },
+    { id: 'groq-vision', name: '👁️ Vision AI (Gemini Fallback)' },
     { id: 'or-gemma', name: '✨ Gemma 2 9B (OpenRouter)' },
     { id: 'or-phi', name: '🔬 Phi-3 Mini (OpenRouter)' },
     { id: 'or-qwen', name: '🐉 Qwen 2 7B (OpenRouter)' },
