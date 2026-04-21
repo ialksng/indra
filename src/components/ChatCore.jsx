@@ -480,7 +480,34 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                      </div>
                    ) : (
                      <>
-                        {msg.text && <span>{msg.text}</span>}
+                        {msg.text && (
+                          <div className="inline">
+                            {msg.text.split(/(!\[.*?\]\(.*?\))/g).map((part, idx) => {
+                              const match = part.match(/!\[(.*?)\]\((.*?)\)/);
+                              if (match) {
+                                const altText = match[1];
+                                const url = match[2];
+                                return (
+                                  <div key={`md-img-${idx}`} className="relative group mt-4 mb-2 block w-max">
+                                    <img 
+                                      src={url} 
+                                      crossOrigin="anonymous" 
+                                      alt={altText || "AI Generated"} 
+                                      className="rounded-xl max-h-64 w-auto object-cover border border-white/10 shadow-lg" 
+                                    />
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
+                                       <button onClick={() => setShowSaveDialog(url)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
+                                         <Download size={16} /> Save Options
+                                       </button>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return <span key={`text-${idx}`}>{part}</span>;
+                            })}
+                          </div>
+                        )}
+                        
                         {msg.isStreaming && (
                           <span className="inline-block w-1.5 h-4 bg-amber-500 ml-1 rounded-sm align-middle animate-pulse shadow-[0_0_5px_rgba(245,158,11,0.5)]"></span>
                         )}
