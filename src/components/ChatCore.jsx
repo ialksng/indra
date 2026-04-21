@@ -44,13 +44,18 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     return () => window.removeEventListener('message', handleWindowMsg);
   }, []);
 
-  // ⚡ NEW: Real-Time Live Vision Loop (Like Gemini Live)
+  // ⚡ UPGRADED: Real-Time Live Vision Loop (Supports Camera AND Screen Share)
   useEffect(() => {
     let isProcessing = false;
 
-    if (activeVideoSource === 'camera') {
+    if (activeVideoSource === 'camera' || activeVideoSource === 'screen') {
       // Auto-enable voice so the AI can speak what it sees
       setVoiceEnabled(true); 
+
+      // Adjust prompt based on what we are looking at
+      const backgroundPrompt = activeVideoSource === 'camera'
+        ? "Identify the main object in this image. Reply with ONLY 1 to 4 words. No markdown, no extra text."
+        : "Briefly state what is open on this screen. Reply with ONLY 1 to 6 words. No markdown, no extra text.";
 
       // Every 5 seconds, capture a frame and ask AI what it is silently
       visionIntervalRef.current = setInterval(async () => {
@@ -66,7 +71,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              message: "Identify the main object in this image. Reply with ONLY 1 to 4 words. No markdown, no extra text.", 
+              message: backgroundPrompt, 
               image: frame, 
               modelType: 'flash', // Fast vision model
               allowAutomation: false,
@@ -100,9 +105,10 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               }
             }
             
-            // Speak the detected object if voice is enabled
+            // Speak the detected object/screen content if voice is enabled
             if (finalAnswer.trim()) {
-              speakText(`I see ${finalAnswer.trim().replace(/[*#.`]/g, '')}`);
+              const prefix = activeVideoSource === 'camera' ? "I see " : "You are looking at ";
+              speakText(`${prefix} ${finalAnswer.trim().replace(/[*#.`]/g, '')}`);
             }
           }
         } catch (e) {
@@ -110,7 +116,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         } finally {
           isProcessing = false;
         }
-      }, 5000); 
+      }, 5000); // 5000ms = 5 seconds. You can increase this to 7000 if it talks too much.
     }
 
     return () => {
@@ -260,14 +266,9 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     setShowSaveDialog(null);
   };
 
-  // ⚡ NEW: Upgraded Image Parser forces Pollinations.ai links directly into inline images
   const renderMessageText = (text) => {
     if (!text) return "";
     
-    // Regex matches: 
-    // 1. Standard markdown ![alt](url)
-    // 2. Clickable markdown [text](pollinations_url)
-    // 3. Raw pollinations URLs https://image.pollinations.ai/...
     const combinedRegex = /!\[.*?\]\((.*?)\)|\[.*?\]\((https:\/\/image\.pollinations\.ai[^\)]+)\)|(https:\/\/image\.pollinations\.ai[^\s\)]+)/g;
     
     const parts = [];
@@ -279,7 +280,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         parts.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex, match.index)}</span>);
       }
       
-      // Grab whichever capture group triggered the match
       const imgUrl = match[1] || match[2] || match[3];
       
       parts.push(
@@ -430,10 +430,10 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ⚡ NEW: LIVE VIDEO PREVIEW WITH VISION BADGE */}
+      {/* ⚡ UPGRADED: LIVE VIDEO PREVIEW WITH VISION BADGE FOR BOTH CAMERA & SCREEN */}
       <div className={`p-2 bg-black/40 border-t border-white/10 flex justify-center backdrop-blur-md ${activeVideoSource ? 'flex' : 'hidden'}`}>
         <div className="relative rounded-xl overflow-hidden border-2 border-amber-500/30 shadow-2xl">
-          {activeVideoSource === 'camera' && (
+          {(activeVideoSource === 'camera' || activeVideoSource === 'screen') && (
             <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md border border-amber-500/30">
               <span className="w-1.5 h-1.5 bg-red-500 animate-pulse rounded-full"></span>
               <span className="text-[9px] text-amber-500 font-bold tracking-widest uppercase">Live Vision</span>
