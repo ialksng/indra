@@ -17,32 +17,75 @@
   const style = document.createElement('style');
   style.textContent = `
     :host { all: initial; }
-    #indra-widget-container { position: fixed; bottom: 20px; right: 20px; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-end; font-family: sans-serif; }
+    #indra-widget-container { 
+      position: fixed; 
+      bottom: 24px; 
+      right: 24px; 
+      z-index: 2147483647; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: flex-end; 
+      font-family: system-ui, sans-serif; 
+    }
     #indra-iframe { 
-      width: 380px; height: 600px; max-height: calc(100vh - 100px); 
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; 
-      box-shadow: 0 10px 40px rgba(0,0,0,0.3); display: none; 
-      margin-bottom: 16px; background: #0f172a; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-      overflow: hidden; opacity: 0; transform: translateY(10px);
+      width: 380px; 
+      height: 600px; 
+      max-height: calc(100vh - 120px); 
+      border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 16px; 
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+      display: none; 
+      margin-bottom: 20px; 
+      background: #0b0f1a; 
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); 
+      overflow: hidden; 
+      opacity: 0; 
+      transform: translateY(20px) scale(0.95);
+      transform-origin: bottom right;
     }
-    #indra-iframe.visible { display: block; opacity: 1; transform: translateY(0); }
+    #indra-iframe.visible { 
+      display: block; 
+      opacity: 1; 
+      transform: translateY(0) scale(1); 
+    }
+    
+    /* ⚡ Premium Thunderbolt Button */
     #indra-toggle-btn { 
-      width: 60px; height: 60px; border-radius: 30px; 
-      background: linear-gradient(135deg, #FACC15, #F97316); color: #000; 
-      border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); 
-      display: flex; justify-content: center; align-items: center; 
-      transition: transform 0.2s, box-shadow 0.2s; 
+      width: 88px; /* 5.5rem */
+      height: 88px; 
+      border-radius: 9999px; 
+      background: linear-gradient(to bottom right, #f59e0b, #f97316); 
+      color: #000; 
+      border: none; 
+      cursor: pointer; 
+      box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.5); 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); 
     }
-    #indra-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6); }
-    #indra-toggle-btn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
+    #indra-toggle-btn:hover { 
+      transform: scale(1.05); 
+    }
+    #indra-toggle-btn.open {
+      background: rgba(255, 255, 255, 0.1);
+      transform: rotate(45deg);
+      color: #fff;
+      box-shadow: none;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #indra-toggle-btn svg { 
+      width: 32px; 
+      height: 32px; 
+    }
     
     @keyframes indraAgentPulse {
-      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); outline: 2px solid #FACC15; }
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); outline: 2px solid #f59e0b; }
       70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); outline: 2px solid rgba(245, 158, 11, 0.5); }
       100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); outline: transparent; }
     }
     .indra-highlight { animation: indraAgentPulse 1s ease-out forwards; border-radius: inherit; }
-    @media (max-width: 480px) { #indra-iframe { width: calc(100vw - 40px); } }
+    @media (max-width: 480px) { #indra-iframe { width: calc(100vw - 48px); } }
   `;
 
   const iframe = document.createElement('iframe');
@@ -53,8 +96,11 @@
 
   const button = document.createElement('button');
   button.id = 'indra-toggle-btn';
-  const chatIcon = `<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
-  const closeIcon = `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  
+  // ⚡ Updated to match Lucide Zap/X icons
+  const chatIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+  const closeIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+  
   button.innerHTML = chatIcon;
 
   let isOpen = false;
@@ -62,9 +108,11 @@
     isOpen = !isOpen;
     if (isOpen) {
       iframe.classList.add('visible');
+      button.classList.add('open');
       button.innerHTML = closeIcon;
     } else {
       iframe.classList.remove('visible');
+      button.classList.remove('open');
       button.innerHTML = chatIcon;
     }
   };
@@ -82,19 +130,16 @@
 
   // --- MESSAGE HUB ---
   window.addEventListener('message', (event) => {
-    // Note: Added gurukul.ialksng.me to the allowed origins list to ensure it can command the widget
     if (!event.origin.includes('indra.ialksng.me') && !event.origin.includes('localhost') && !event.origin.includes('gurukul.ialksng.me')) return;
 
     const { type, payload } = event.data;
 
-    // ⚡ NEW: Programmatically open the widget
     if (type === 'OPEN_INDRA_WIDGET') {
       if (!isOpen) {
-        button.click(); // Simulates a user clicking the toggle button
+        button.click();
       }
     }
 
-    // ⚡ NEW: Forward pre-filled text straight into the widget iframe
     if (type === 'PREFILL_INDRA') {
       iframe.contentWindow.postMessage({ type: 'PREFILL_MSG', payload }, '*');
     }
@@ -143,7 +188,6 @@
       }
     }
 
-    // Handle dynamic iframe resizing
     if (type === 'SET_WIDGET_SIZE') {
         iframe.style.width = payload.width || '380px';
         iframe.style.height = payload.height || '600px';
