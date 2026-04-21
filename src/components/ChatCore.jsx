@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search, Command } from 'lucide-react';
+import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 import { useMedia } from '../hooks/useMedia';
 
@@ -52,7 +52,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       if (!tab) return null;
       return await chrome.tabs.sendMessage(tab.id, { type: 'GET_LIVE_CONTEXT' });
     } catch (e) {
-      console.warn("Chrome Extension context not available. Are you running this as an extension?");
+      console.warn("Chrome Extension context not available.");
       return null;
     }
   };
@@ -94,7 +94,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         isProcessing = true;
         try {
           const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-          const response = await fetch(`${baseUrl}/chat`, {
+          const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -205,7 +205,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
 
       const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${baseUrl}/chat`, {
+      const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -213,7 +213,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
           image: imageToSend, 
           modelType: selectedModel, 
           allowAutomation: automationEnabled,
-          pageContext: livePageContext, // Tells AI what buttons/inputs are visible
+          pageContext: livePageContext, 
           history: messages, 
           projectId 
         })
@@ -242,6 +242,20 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
 
             try {
               const data = JSON.parse(payload);
+              
+              // ⚡ NATIVE IMAGE HANDLING: Catches tool-call images from the backend
+              if (data.imageUrl) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const lastIndex = updated.length - 1;
+                  if (updated[lastIndex]) {
+                    updated[lastIndex].generatedImages = updated[lastIndex].generatedImages || [];
+                    updated[lastIndex].generatedImages.push(data.imageUrl);
+                  }
+                  return updated;
+                });
+              }
+
               if (data.text) {
                 streamedText += data.text;
                 
@@ -293,21 +307,39 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     }
   };
 
+  // ⚡ UPDATED: Forces direct download using CORS fetch to prevent redirects
   const downloadToDevice = async (url) => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { 
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok) throw new Error("Network response was not ok");
+      
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
+      
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = `indra_gen_${Date.now()}.jpg`;
       document.body.appendChild(a);
       a.click();
+      
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
       setShowSaveDialog(null);
-    } catch (_e) {
-      window.open(url, '_blank');
+      
+    } catch (e) {
+      console.error("Direct download blocked. Attempting fallback...", e);
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.download = `indra_gen_${Date.now()}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       setShowSaveDialog(null);
     }
   };
@@ -316,38 +348,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     setVaultData(prev => prev + (prev ? '\n\n' : '') + `[Saved Reference Image]: ${url}`);
     setIsVaultOpen(true);
     setShowSaveDialog(null);
-  };
-
-  const renderMessageText = (text) => {
-    if (!text) return "";
-    
-    const combinedRegex = /!\[.*?\]\((.*?)\)|\[.*?\]\((https:\/\/image\.pollinations\.ai[^\)]+)\)|(https:\/\/image\.pollinations\.ai[^\s\)]+)/g;
-    
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = combinedRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex, match.index)}</span>);
-      }
-      
-      const imgUrl = match[1] || match[2] || match[3];
-      
-      parts.push(
-        <div key={`img-${match.index}`} className="relative group mt-3 mb-3 block">
-          <img src={imgUrl} alt="AI Gen" className="rounded-xl max-h-64 object-cover border border-white/10 shadow-lg" />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
-             <button onClick={() => setShowSaveDialog(imgUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
-               <Download size={16} /> Save Options
-             </button>
-          </div>
-        </div>
-      );
-      lastIndex = combinedRegex.lastIndex;
-    }
-    if (lastIndex < text.length) parts.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex)}</span>);
-    return parts.length > 0 ? parts : text;
   };
 
   const handleDeviceUpload = (e) => { 
@@ -375,7 +375,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               <h3 className="text-amber-400 font-bold tracking-wide">SAVE GENERATED IMAGE</h3>
               <button onClick={() => setShowSaveDialog(null)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
-            <img src={showSaveDialog} className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
+            <img src={showSaveDialog} crossOrigin="anonymous" className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
             <div className="flex flex-col gap-2">
               <button onClick={() => downloadToDevice(showSaveDialog)} className="flex items-center justify-center gap-3 bg-amber-500 text-black py-3 rounded-xl font-bold hover:bg-amber-400 transition-all shadow-lg">
                 <Download size={18} /> Download to Device
@@ -458,7 +458,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                 {msg.image && <img src={msg.image} className="rounded-xl mb-3 max-h-48 object-cover border border-white/10 shadow-lg" alt="upload"/>}
                 <div className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
                    
-                   {msg.role === 'ai' && !msg.text && msg.isStreaming ? (
+                   {/* ⚡ UPDATED: Native Image & Text Renderer */}
+                   {msg.role === 'ai' && !msg.text && (!msg.generatedImages || msg.generatedImages.length === 0) && msg.isStreaming ? (
                      <div className="flex gap-1.5 items-center h-6 px-1">
                         <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
@@ -466,10 +467,27 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                      </div>
                    ) : (
                      <>
-                        {renderMessageText(msg.text)}
+                        {msg.text && <span>{msg.text}</span>}
                         {msg.isStreaming && (
                           <span className="inline-block w-1.5 h-4 bg-amber-500 ml-1 rounded-sm align-middle animate-pulse shadow-[0_0_5px_rgba(245,158,11,0.5)]"></span>
                         )}
+                        
+                        {/* Native Tool Images Map */}
+                        {msg.generatedImages && msg.generatedImages.map((imgUrl, idx) => (
+                          <div key={`gen-img-${idx}`} className="relative group mt-4 mb-2 block">
+                            <img 
+                              src={imgUrl} 
+                              crossOrigin="anonymous" 
+                              alt="AI Generated" 
+                              className="rounded-xl max-h-64 w-auto object-cover border border-white/10 shadow-lg" 
+                            />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
+                               <button onClick={() => setShowSaveDialog(imgUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
+                                 <Download size={16} /> Save Options
+                               </button>
+                            </div>
+                          </div>
+                        ))}
                      </>
                    )}
 
