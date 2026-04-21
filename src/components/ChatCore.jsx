@@ -27,13 +27,12 @@ export default function ChatCore() {
     e?.preventDefault();
     if (!input.trim() && !selectedImage && !activeVideoSource) return;
     
-    // Visually add user message, clear inputs
     setMessages(prev => [...prev, { role: 'user', text: input, image: selectedImage }]);
     setInput('');
     setSelectedImage(null);
     setShowTextInput(false);
     setActiveVideoSource(null);
-    setIsLoading(true); // Toggle loading state visually
+    setIsLoading(true); 
   };
 
   const handleDeviceUpload = (e) => { 
@@ -94,8 +93,6 @@ export default function ChatCore() {
 
       {/* HEADER */}
       <div className="indra-header">
-        
-        {/* 3-Way Toggle */}
         <div className="indra-model-toggle">
           {['lite', 'smart', 'ultra'].map((mode) => (
             <button
@@ -174,7 +171,7 @@ export default function ChatCore() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ⚡ LIVE VIDEO PREVIEW (Dumb Shell) */}
+      {/* ⚡ LIVE VIDEO PREVIEW */}
       <div className="indra-video-panel" style={{ display: activeVideoSource ? 'flex' : 'none' }}>
         <div className="indra-video-wrapper">
           <div className="indra-video-tag">
@@ -223,35 +220,47 @@ export default function ChatCore() {
           </div>
         ) : (
           <div className="indra-center-hub">
-            {showActionMenu && (
-              <div className="indra-action-menu">
+            {/* ⚡ PREMIUM EXPANDING DOCK */}
+            <div className={`indra-action-dock ${showActionMenu ? 'open' : ''}`}>
+              
+              {/* Left Icons */}
+              <div className="indra-dock-side left">
                 <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Search size={24} className="indra-menu-item-icon"/>
+                  <Search size={22} className="indra-menu-item-icon"/>
                   <span>SEARCH</span>
                 </button>
                 <button onClick={() => { setShowTextInput(true); setVoiceEnabled(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Mic size={24} className="indra-menu-item-icon"/>
+                  <Mic size={22} className="indra-menu-item-icon"/>
                   <span>VOICE</span>
                 </button>
                 <button onClick={() => { setActiveVideoSource('camera'); setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Camera size={24} className="indra-menu-item-icon"/>
+                  <Camera size={22} className="indra-menu-item-icon"/>
                   <span>CAMERA</span>
                 </button>
+              </div>
+
+              {/* Spacer for the absolute positioned main button */}
+              <div className="indra-dock-spacer"></div>
+
+              {/* Right Icons */}
+              <div className="indra-dock-side right">
                 <button onClick={() => { setActiveVideoSource('screen'); setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <MonitorUp size={24} className="indra-menu-item-icon"/>
+                  <MonitorUp size={22} className="indra-menu-item-icon"/>
                   <span>PRESENT</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="indra-menu-item">
-                  <HardDrive size={24} className="indra-menu-item-icon"/>
+                <button onClick={() => { fileInputRef.current?.click(); setShowActionMenu(false); }} className="indra-menu-item">
+                  <HardDrive size={22} className="indra-menu-item-icon"/>
                   <span>DEVICE</span>
                 </button>
                 <button onClick={() => { setIsVaultOpen(true); setShowActionMenu(false); }} className="indra-menu-item">
-                  <Database size={24} className="indra-menu-item-icon"/>
+                  <Database size={22} className="indra-menu-item-icon"/>
                   <span>VAULT</span>
                 </button>
               </div>
-            )}
 
+            </div>
+
+            {/* Main Center Button */}
             <button 
               onClick={() => setShowActionMenu(!showActionMenu)}
               className={`indra-thunder-btn ${showActionMenu ? 'open' : ''}`}

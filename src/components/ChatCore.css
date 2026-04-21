@@ -168,7 +168,6 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* 3-Way Toggle */
 .indra-model-toggle {
   display: flex;
   background-color: var(--bg-light-5);
@@ -450,6 +449,7 @@
 }
 .indra-close-video:hover { background-color: var(--color-red-500); }
 
+/* --- ACTION HUB --- */
 .indra-action-hub {
   padding: 1.5rem;
   background-color: rgba(0, 0, 0, 0.2);
@@ -517,21 +517,6 @@
   border-color: var(--color-amber-500);
   background-color: var(--bg-light-10);
 }
-.indra-main-input.recording {
-  border-color: var(--color-amber-500);
-  box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
-}
-
-.indra-recording-indicator {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.indra-rec-bar { width: 0.25rem; background-color: var(--color-amber-500); border-radius: 9999px; }
 
 .indra-send-btn {
   padding: 1rem;
@@ -548,24 +533,69 @@
 }
 .indra-send-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
-.indra-center-hub { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
+/* --- PREMIUM EXPANDING DOCK --- */
+.indra-center-hub { 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  width: 100%; 
+  position: relative; 
+  height: 5.5rem; /* Provides fixed height for absolute positioning */
+}
 
-.indra-action-menu {
+.indra-action-dock {
   position: absolute;
-  bottom: 6rem;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
   background-color: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  padding: 1rem;
-  border-radius: 2.5rem;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-light);
+  border-radius: 9999px;
+  height: 5.5rem;
+  padding: 0 0.5rem;
+  
+  /* Initial hidden state -> Matches the size of the thunderbolt button */
+  width: 5rem;
+  opacity: 0;
+  pointer-events: none;
+  
+  /* Premium spring easing */
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.indra-action-dock.open {
+  width: 100%;
+  max-width: 36rem; /* Full expansion width */
+  opacity: 1;
+  pointer-events: auto;
   box-shadow: var(--shadow-2xl);
-  width: 95%;
-  max-width: 360px;
+}
+
+.indra-dock-spacer {
+  width: 5rem; /* Same width as the thunderbolt button to leave an empty gap in the center */
+  flex-shrink: 0;
+}
+
+.indra-dock-side {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+}
+
+.indra-dock-side.left { justify-content: flex-end; flex: 1; }
+.indra-dock-side.right { justify-content: flex-start; flex: 1; }
+
+.indra-action-dock.open .indra-dock-side {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.15s; /* Fade in items slightly after dock starts expanding */
 }
 
 .indra-menu-item {
@@ -573,24 +603,26 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  width: 100px;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  width: 4.5rem;
+  height: 4.5rem;
   background: transparent;
   border: none;
-  border-radius: 1.875rem;
+  border-radius: 1rem;
   cursor: pointer;
   transition: all 0.2s;
   color: var(--color-gray-500);
 }
 .indra-menu-item:hover { background-color: var(--bg-light-5); }
-.indra-menu-item-icon { transition: all 0.2s; }
-.indra-menu-item:hover .indra-menu-item-icon { color: var(--color-amber-400); transform: scale(1.1); }
-.indra-menu-item span { font-size: 0.5625rem; font-weight: 900; letter-spacing: 0.1em; }
+.indra-menu-item-icon { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.indra-menu-item:hover .indra-menu-item-icon { color: var(--color-amber-400); transform: scale(1.15); }
+.indra-menu-item span { font-size: 0.5rem; font-weight: 900; letter-spacing: 0.05em; }
 
 .indra-thunder-btn {
-  width: 5rem;
-  height: 5rem;
+  position: absolute;
+  width: 5.5rem;
+  height: 5.5rem;
   border-radius: 9999px;
   display: flex;
   align-items: center;
@@ -599,14 +631,15 @@
   background: linear-gradient(to bottom right, var(--color-amber-500), var(--color-orange-500));
   border: none;
   cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  transition: all 0.5s;
+  box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.5);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 20;
 }
-.indra-thunder-btn:hover { transform: scale(1.1); }
+.indra-thunder-btn:hover { transform: scale(1.05); }
 .indra-thunder-btn.open {
   background: var(--bg-light-10);
   transform: rotate(45deg);
   color: #fff;
   box-shadow: none;
+  border: 1px solid var(--border-light);
 }
