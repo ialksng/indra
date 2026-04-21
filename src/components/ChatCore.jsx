@@ -7,7 +7,7 @@ import { useMedia } from '../hooks/useMedia';
 const getCleanImageUrl = (rawUrl) => {
   try {
     if (!rawUrl) return '';
-    if (rawUrl.startsWith('data:')) return rawUrl; // Ignore base64
+    if (rawUrl.startsWith('data:')) return rawUrl; 
     
     let url = new URL(rawUrl);
     if (url.hostname === 'pollinations.ai' && url.pathname.startsWith('/p/')) {
@@ -43,6 +43,22 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const visionIntervalRef = useRef(null);
+
+  // ⚡ UPDATED: Syncing UI labels with the new backend models
+  const models = [
+    { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
+    { id: 'flash-lite', name: '🍃 Gemini 1.5 Flash (Latest)' },
+    { id: 'pro', name: '🧠 Gemini 1.5 Pro (Latest)' },
+    { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
+    { id: 'deepseek', name: '🤔 DeepSeek R1 (OpenRouter)' },
+    { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B (Groq)' },
+    { id: 'groq-vision', name: '👁️ Llama 3.2 90B Vision' },
+    { id: 'or-gemma', name: '✨ Gemma 2 9B (OpenRouter)' },
+    { id: 'or-phi', name: '🔬 Phi-3 Mini (OpenRouter)' },
+    { id: 'or-qwen', name: '🐉 Qwen 2 7B (OpenRouter)' },
+    { id: 'image-generator', name: '🎨 Image Generator' },
+    { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
+  ];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -169,18 +185,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       if (visionIntervalRef.current) clearInterval(visionIntervalRef.current);
     };
   }, [activeVideoSource, captureVideoFrame, projectId, setVoiceEnabled, speakText]);
-
-  const models = [
-    { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
-    { id: 'flash-lite', name: '🍃 Gemini Flash Lite' },
-    { id: 'pro', name: '🧠 Gemini Pro (Complex)' },
-    { id: 'gemini-search', name: '🌐 Web Search (Live Data)' },
-    { id: 'deepseek', name: '🤔 DeepSeek R1 (Math/Logic)' },
-    { id: 'groq-llama-3', name: '🦙 Llama 3.3 70B' },
-    { id: 'groq-vision', name: '👁️ Llama Vision' },
-    { id: 'image-generator', name: '🎨 Image Generator' },
-    { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
-  ];
 
   const handleMicClick = () => {
     setShowTextInput(true); 
