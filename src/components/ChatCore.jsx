@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
 import './ChatCore.css'; 
+import apiClient from '../services/apiClient'; // ✅ Added apiClient import
 
 export default function ChatCore() {
-  // Pure UI State (No Backend Logic)
+  // Pure UI State
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('smart'); 
@@ -22,18 +23,44 @@ export default function ChatCore() {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Purely visual handlers
-  const handleSend = (e) => {
+  // ✅ Updated handleSend with actual backend API call
+  const handleSend = async (e) => {
     e?.preventDefault();
     if (!input.trim() && !selectedImage && !activeVideoSource) return;
     
+    const userMessage = input;
+
     // Visually add user message, clear inputs
-    setMessages(prev => [...prev, { role: 'user', text: input, image: selectedImage }]);
+    setMessages(prev => [...prev, { role: 'user', text: userMessage, image: selectedImage }]);
     setInput('');
     setSelectedImage(null);
     setShowTextInput(false);
     setActiveVideoSource(null);
-    setIsLoading(true); // Toggle loading state visually
+    setIsLoading(true);
+
+    try {
+      // 🚀 Make the API request to the backend using your apiClient
+      const response = await apiClient.post('/api/v1/indra/chat', {
+        message: userMessage,
+        mode: selectedModel,
+        agent: automationEnabled
+      });
+
+      // ✅ Add the AI's response to the chat window
+      setMessages(prev => [...prev, { 
+        role: 'ai', 
+        text: response.data.message
+      }]);
+
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      setMessages(prev => [...prev, { 
+        role: 'ai', 
+        text: "Sorry, I couldn't reach the server. Please check your connection." 
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDeviceUpload = (e) => { 
@@ -174,7 +201,7 @@ export default function ChatCore() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ⚡ LIVE VIDEO PREVIEW (Dumb Shell) */}
+      {/* ⚡ LIVE VIDEO PREVIEW */}
       <div className="indra-video-panel" style={{ display: activeVideoSource ? 'flex' : 'none' }}>
         <div className="indra-video-wrapper">
           <div className="indra-video-tag">
