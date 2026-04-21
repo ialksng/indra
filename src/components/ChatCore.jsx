@@ -7,7 +7,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false); // Tracks live browser automation
+  const [isExecuting, setIsExecuting] = useState(false); 
   
   // Custom Hooks
   const { isRecording, voiceEnabled, setVoiceEnabled, toggleRecording, speakText, unlockAudio } = useAudio();
@@ -27,12 +27,10 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   const fileInputRef = useRef(null);
   const visionIntervalRef = useRef(null);
 
-  // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Listen for pre-fill text from the host website
   useEffect(() => {
     const handleWindowMsg = (e) => {
       if (e.data && e.data.type === 'PREFILL_MSG') {
@@ -44,7 +42,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     return () => window.removeEventListener('message', handleWindowMsg);
   }, []);
 
-  // ⚡ CHROME EXTENSION HELPERS
   const getActiveTabContext = async () => {
     if (!window.chrome || !chrome.tabs) return null;
     try {
@@ -66,7 +63,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         try {
           await chrome.tabs.sendMessage(tab.id, { type: 'EXECUTE_ACTION', payload: actionData });
         } catch (msgErr) {
-          // Silently handle the "channel closed" error when a page navigates
           console.log("Action executed, but channel closed.");
         }
       }
@@ -99,9 +95,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         isProcessing = true;
         try {
           let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-          if (baseUrl.endsWith('/api/v1/indra')) {
-            baseUrl = baseUrl.replace('/api/v1/indra', '');
-          }
+          if (baseUrl.endsWith('/api/v1/indra')) baseUrl = baseUrl.replace('/api/v1/indra', '');
 
           const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
             method: 'POST',
@@ -195,7 +189,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     let imageToSend = selectedImage;
     if (activeVideoSource) imageToSend = captureVideoFrame();
 
-    // ⚡ AUTOMATION SYNC: Grab DOM map before sending to AI
     let livePageContext = null;
     if (automationEnabled) {
        livePageContext = await getActiveTabContext();
@@ -214,9 +207,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
 
       let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      if (baseUrl.endsWith('/api/v1/indra')) {
-        baseUrl = baseUrl.replace('/api/v1/indra', '');
-      }
+      if (baseUrl.endsWith('/api/v1/indra')) baseUrl = baseUrl.replace('/api/v1/indra', '');
 
       const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
         method: 'POST',
@@ -256,7 +247,20 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
             try {
               const data = JSON.parse(payload);
               
-              // ⚡ NATIVE IMAGE HANDLING: Catches tool-call images from the backend
+              // ⚡ FIX: Catch backend errors directly to avoid leaving empty response boxes
+              if (data.error) {
+                 streamedText += `\n\n❌ **System Error:** ${data.error}`;
+                 setMessages(prev => {
+                   const updated = [...prev];
+                   const lastIndex = updated.length - 1;
+                   if (updated[lastIndex]) {
+                     updated[lastIndex] = { ...updated[lastIndex], text: streamedText };
+                   }
+                   return updated;
+                 });
+                 continue;
+              }
+
               if (data.imageUrl) {
                 setMessages(prev => {
                   const updated = [...prev];
@@ -272,14 +276,12 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               if (data.text) {
                 streamedText += data.text;
                 
-                // ⚡ ACTION INTERCEPTOR: Execute code mid-stream
                 if (automationEnabled && streamedText.includes('<<<EXECUTE:')) {
                   const match = streamedText.match(/<<<EXECUTE:(.*?)>>>/);
                   if (match && match[1]) {
                      try {
                         const actionPayload = JSON.parse(match[1]);
                         await executeWebAction(actionPayload);
-                        // Clean output for the user
                         streamedText = streamedText.replace(match[0], '\n⚡ *Action Executed*');
                      } catch(err) { console.error("Action parse failed", err); }
                   }
@@ -320,7 +322,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     }
   };
 
-  // ⚡ UPDATED: Forces direct download using CORS fetch to prevent redirects
   const downloadToDevice = async (url) => {
     try {
       const response = await fetch(url, { 
@@ -328,22 +329,17 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         mode: 'cors',
         cache: 'no-cache'
       });
-      
       if (!response.ok) throw new Error("Network response was not ok");
-      
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = `indra_gen_${Date.now()}.jpg`;
       document.body.appendChild(a);
       a.click();
-      
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
       setShowSaveDialog(null);
-      
     } catch (e) {
       console.error("Direct download blocked. Attempting fallback...", e);
       const a = document.createElement('a');
@@ -471,7 +467,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                 {msg.image && <img src={msg.image} className="rounded-xl mb-3 max-h-48 object-cover border border-white/10 shadow-lg" alt="upload"/>}
                 <div className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
                    
-                   {/* ⚡ UPDATED: Native Image & Text Renderer */}
                    {msg.role === 'ai' && !msg.text && (!msg.generatedImages || msg.generatedImages.length === 0) && msg.isStreaming ? (
                      <div className="flex gap-1.5 items-center h-6 px-1">
                         <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
@@ -512,7 +507,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                           <span className="inline-block w-1.5 h-4 bg-amber-500 ml-1 rounded-sm align-middle animate-pulse shadow-[0_0_5px_rgba(245,158,11,0.5)]"></span>
                         )}
                         
-                        {/* Native Tool Images Map */}
                         {msg.generatedImages && msg.generatedImages.map((imgUrl, idx) => (
                           <div key={`gen-img-${idx}`} className="relative group mt-4 mb-2 block">
                             <img 
