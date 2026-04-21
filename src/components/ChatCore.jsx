@@ -30,13 +30,12 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ⚡ NEW: Listen for pre-fill text from the host website (Gurukul)
+  // Listen for pre-fill text from the host website
   useEffect(() => {
     const handleWindowMsg = (e) => {
-      // Ensure we only listen to the specific PREFILL_MSG type
       if (e.data && e.data.type === 'PREFILL_MSG') {
         setInput(e.data.payload);
-        setShowTextInput(true); // Ensure the input box is visible
+        setShowTextInput(true); 
       }
     };
 
@@ -56,27 +55,41 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
   ];
 
+  // ⚡ UPGRADED: Real-time Voice Interaction
   const handleMicClick = () => {
     setShowTextInput(true); 
-    toggleRecording((transcript) => {
-      setInput(prev => prev + (prev ? ' ' : '') + transcript);
-    });
+    setVoiceEnabled(true); // Automatically enable AI voice when user uses mic
+
+    toggleRecording(
+      // 1. Final Result: Auto-send to AI
+      (finalText) => {
+        setInput(finalText);
+        handleSend(null, finalText); 
+      },
+      // 2. Interim Result: Show live typing
+      (liveText) => {
+        setInput(liveText);
+      }
+    );
   };
 
-  const handleSend = async (e) => {
+  // ⚡ UPGRADED: Added overrideText parameter for instant voice sending
+  const handleSend = async (e, overrideText = null) => {
     e?.preventDefault();
-    if (isLoading || (!input.trim() && !selectedImage && !activeVideoSource)) return;
+    
+    const textToSend = overrideText !== null ? overrideText : input;
+    
+    if (isLoading || (!textToSend.trim() && !selectedImage && !activeVideoSource)) return;
 
     unlockAudio(); 
 
     let imageToSend = selectedImage;
     if (activeVideoSource) imageToSend = captureVideoFrame();
 
-    const userMsg = { role: 'user', text: input, image: imageToSend };
+    const userMsg = { role: 'user', text: textToSend, image: imageToSend };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
     
-    const messagePayload = input;
     setInput('');
     setSelectedImage(null);
     setShowTextInput(false);
@@ -89,7 +102,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       const response = await fetch(`${baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messagePayload, image: imageToSend, modelType: selectedModel, allowAutomation: automationEnabled, history: messages, projectId })
+        body: JSON.stringify({ message: textToSend, image: imageToSend, modelType: selectedModel, allowAutomation: automationEnabled, history: messages, projectId })
       });
 
       if (!response.ok) throw new Error(`Server Error: ${response.status}`);
@@ -97,18 +110,25 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let streamedText = "";
+      let buffer = ""; 
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true }); 
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true }); 
+        const lines = buffer.split('\n');
+        
+        buffer = lines.pop() || '';
         
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          const trimmedLine = line.trim();
+          if (trimmedLine.startsWith('data: ')) {
+            const payload = trimmedLine.substring(6);
+            if (payload === '[DONE]') continue;
+
             try {
-              const data = JSON.parse(line.substring(6));
+              const data = JSON.parse(payload);
               if (data.text) {
                 streamedText += data.text;
                 
@@ -121,7 +141,9 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                   return updated;
                 });
               }
-            } catch (_e) {}
+            } catch (_e) {
+              // Silently ignore incomplete JSON fragments if they slip through
+            }
           }
         }
       }
@@ -307,20 +329,27 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               <div className={msg.role === 'user' ? 'p-4 rounded-2xl shadow-xl bg-gradient-to-br from-amber-500 to-orange-500 text-black font-semibold' : 'p-4 rounded-2xl shadow-xl bg-white/5 border border-white/10 text-slate-200'}>
                 {msg.image && <img src={msg.image} className="rounded-xl mb-3 max-h-48 object-cover border border-white/10 shadow-lg" alt="upload"/>}
                 <div className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
-                   {msg.role === 'ai' && msg.text === '' && msg.isStreaming ? (
-                     <div className="flex gap-1 items-center h-6">
-                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                   
+                   {msg.role === 'ai' && !msg.text && msg.isStreaming ? (
+                     <div className="flex gap-1.5 items-center h-6 px-1">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
                      </div>
-                   ) : renderMessageText(msg.text)}
-                   {msg.isStreaming && msg.text !== '' && <span className="inline-block w-2 h-4 bg-amber-500 ml-1 animate-pulse"></span>}
+                   ) : (
+                     <>
+                        {renderMessageText(msg.text)}
+                        {msg.isStreaming && (
+                          <span className="inline-block w-1.5 h-4 bg-amber-500 ml-1 rounded-sm align-middle animate-pulse shadow-[0_0_5px_rgba(245,158,11,0.5)]"></span>
+                        )}
+                     </>
+                   )}
+
                 </div>
               </div>
             </div>
           </div>
         ))}
-        {/* Fallback loader if not streaming text yet */}
         {isLoading && !messages[messages.length-1]?.isStreaming && <Loader2 className="animate-spin text-amber-500 mx-auto" size={24} />}
         <div ref={messagesEndRef} />
       </div>
@@ -374,7 +403,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               )}
             </div>
             
-            <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage && !activeVideoSource)} className="p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-lg shadow-amber-500/40 transition-all">
+            <button onClick={(e) => handleSend(e)} disabled={isLoading || (!input.trim() && !selectedImage && !activeVideoSource)} className="p-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl disabled:opacity-20 text-black shadow-lg shadow-amber-500/40 transition-all">
               <Send size={22} />
             </button>
           </div>
