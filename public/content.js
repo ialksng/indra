@@ -28,11 +28,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         });
         
-        sendResponse({ 
-            url: window.location.href, 
-            title: document.title, 
-            map: liveMap 
-        });
+        try {
+            sendResponse({ 
+                url: window.location.href, 
+                title: document.title, 
+                map: liveMap 
+            });
+        } catch (e) {
+            // Ignore if channel is already closed
+        }
         return true; 
     }
 
@@ -42,7 +46,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         if (action === 'scroll') {
             window.scrollBy({ top: value || window.innerHeight / 2, behavior: 'smooth' });
-            sendResponse({ success: true, message: "Scrolled successfully" });
+            try { sendResponse({ success: true, message: "Scrolled successfully" }); } catch (e) {}
             return true;
         }
 
@@ -66,14 +70,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                     element.style.outline = originalOutline;
                     element.style.boxShadow = "none";
-                    sendResponse({ success: true });
+                    try { sendResponse({ success: true }); } catch (e) {}
                 } catch (err) {
-                    sendResponse({ success: false, error: err.message });
+                    try { sendResponse({ success: false, error: err.message }); } catch (e) {}
                 }
             }, 600); 
             return true; 
         } else {
-            sendResponse({ success: false, error: "Element not found on screen" });
+            try { sendResponse({ success: false, error: "Element not found on screen" }); } catch (e) {}
             return true;
         }
     }

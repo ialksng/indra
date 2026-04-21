@@ -63,7 +63,12 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       setIsExecuting(true);
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab) {
-        await chrome.tabs.sendMessage(tab.id, { type: 'EXECUTE_ACTION', payload: actionData });
+        try {
+          await chrome.tabs.sendMessage(tab.id, { type: 'EXECUTE_ACTION', payload: actionData });
+        } catch (msgErr) {
+          // Silently handle the "channel closed" error when a page navigates
+          console.log("Action executed, but channel closed.");
+        }
       }
       return true;
     } catch (e) {
@@ -93,7 +98,11 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
 
         isProcessing = true;
         try {
-          const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+          let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+          if (baseUrl.endsWith('/api/v1/indra')) {
+            baseUrl = baseUrl.replace('/api/v1/indra', '');
+          }
+
           const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -204,7 +213,11 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     try {
       setMessages(prev => [...prev, { role: 'ai', text: '', isStreaming: true }]);
 
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      if (baseUrl.endsWith('/api/v1/indra')) {
+        baseUrl = baseUrl.replace('/api/v1/indra', '');
+      }
+
       const response = await fetch(`${baseUrl}/api/v1/indra/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
