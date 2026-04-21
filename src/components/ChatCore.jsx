@@ -3,6 +3,23 @@ import { Send, Loader2, X, Camera, Database, HardDrive, ChevronDown, MonitorUp, 
 import { useAudio } from '../hooks/useAudio';
 import { useMedia } from '../hooks/useMedia';
 
+// ⚡ UTILITY: Cleans URLs so HTML pages are converted to direct raw image links
+const getCleanImageUrl = (rawUrl) => {
+  try {
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('data:')) return rawUrl; // Ignore base64
+    
+    let url = new URL(rawUrl);
+    if (url.hostname === 'pollinations.ai' && url.pathname.startsWith('/p/')) {
+      const promptPath = url.pathname.replace('/p/', '/prompt/');
+      return `https://image.pollinations.ai${promptPath}${url.search}`;
+    }
+    return rawUrl;
+  } catch (e) {
+    return rawUrl;
+  }
+};
+
 export default function ChatCore({ projectId = 'default', _isCompact = false }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -247,7 +264,6 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
             try {
               const data = JSON.parse(payload);
               
-              // ⚡ FIX: Catch backend errors directly to avoid leaving empty response boxes
               if (data.error) {
                  streamedText += `\n\n❌ **System Error:** ${data.error}`;
                  setMessages(prev => {
@@ -324,7 +340,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
 
   const downloadToDevice = async (url) => {
     try {
-      const response = await fetch(url, { 
+      const targetUrl = getCleanImageUrl(url);
+      const response = await fetch(targetUrl, { 
         method: 'GET',
         mode: 'cors',
         cache: 'no-cache'
@@ -342,8 +359,9 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
       setShowSaveDialog(null);
     } catch (e) {
       console.error("Direct download blocked. Attempting fallback...", e);
+      const targetUrl = getCleanImageUrl(url);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = targetUrl;
       a.target = '_blank';
       a.download = `indra_gen_${Date.now()}.jpg`;
       document.body.appendChild(a);
@@ -354,7 +372,8 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   };
 
   const saveToSmartSphere = (url) => {
-    setVaultData(prev => prev + (prev ? '\n\n' : '') + `[Saved Reference Image]: ${url}`);
+    const cleanUrl = getCleanImageUrl(url);
+    setVaultData(prev => prev + (prev ? '\n\n' : '') + `[Saved Reference Image]: ${cleanUrl}`);
     setIsVaultOpen(true);
     setShowSaveDialog(null);
   };
@@ -384,7 +403,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
               <h3 className="text-amber-400 font-bold tracking-wide">SAVE GENERATED IMAGE</h3>
               <button onClick={() => setShowSaveDialog(null)} className="text-gray-400 hover:text-white"><X size={20}/></button>
             </div>
-            <img src={showSaveDialog} crossOrigin="anonymous" className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
+            <img src={getCleanImageUrl(showSaveDialog)} crossOrigin="anonymous" className="rounded-xl max-h-48 object-contain bg-black/50 border border-white/5" alt="Preview" />
             <div className="flex flex-col gap-2">
               <button onClick={() => downloadToDevice(showSaveDialog)} className="flex items-center justify-center gap-3 bg-amber-500 text-black py-3 rounded-xl font-bold hover:bg-amber-400 transition-all shadow-lg">
                 <Download size={18} /> Download to Device
@@ -481,17 +500,18 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                               const match = part.match(/!\[(.*?)\]\((.*?)\)/);
                               if (match) {
                                 const altText = match[1];
-                                const url = match[2];
+                                const rawUrl = match[2];
+                                const cleanUrl = getCleanImageUrl(rawUrl);
                                 return (
                                   <div key={`md-img-${idx}`} className="relative group mt-4 mb-2 block w-max">
                                     <img 
-                                      src={url} 
+                                      src={cleanUrl} 
                                       crossOrigin="anonymous" 
                                       alt={altText || "AI Generated"} 
                                       className="rounded-xl max-h-64 w-auto object-cover border border-white/10 shadow-lg" 
                                     />
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
-                                       <button onClick={() => setShowSaveDialog(url)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
+                                       <button onClick={() => setShowSaveDialog(cleanUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
                                          <Download size={16} /> Save Options
                                        </button>
                                     </div>
@@ -507,21 +527,24 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                           <span className="inline-block w-1.5 h-4 bg-amber-500 ml-1 rounded-sm align-middle animate-pulse shadow-[0_0_5px_rgba(245,158,11,0.5)]"></span>
                         )}
                         
-                        {msg.generatedImages && msg.generatedImages.map((imgUrl, idx) => (
-                          <div key={`gen-img-${idx}`} className="relative group mt-4 mb-2 block">
-                            <img 
-                              src={imgUrl} 
-                              crossOrigin="anonymous" 
-                              alt="AI Generated" 
-                              className="rounded-xl max-h-64 w-auto object-cover border border-white/10 shadow-lg" 
-                            />
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
-                               <button onClick={() => setShowSaveDialog(imgUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
-                                 <Download size={16} /> Save Options
-                               </button>
+                        {msg.generatedImages && msg.generatedImages.map((imgUrl, idx) => {
+                          const cleanUrl = getCleanImageUrl(imgUrl);
+                          return (
+                            <div key={`gen-img-${idx}`} className="relative group mt-4 mb-2 block">
+                              <img 
+                                src={cleanUrl} 
+                                crossOrigin="anonymous" 
+                                alt="AI Generated" 
+                                className="rounded-xl max-h-64 w-auto object-cover border border-white/10 shadow-lg" 
+                              />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-sm">
+                                 <button onClick={() => setShowSaveDialog(cleanUrl)} className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transform hover:scale-105 transition-all shadow-xl">
+                                   <Download size={16} /> Save Options
+                                 </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                      </>
                    )}
 
