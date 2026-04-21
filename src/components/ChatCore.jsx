@@ -24,6 +24,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const visionIntervalRef = useRef(null);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -43,6 +44,80 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     return () => window.removeEventListener('message', handleWindowMsg);
   }, []);
 
+  // ⚡ NEW: Real-Time Live Vision Loop (Like Gemini Live)
+  useEffect(() => {
+    let isProcessing = false;
+
+    if (activeVideoSource === 'camera') {
+      // Auto-enable voice so the AI can speak what it sees
+      setVoiceEnabled(true); 
+
+      // Every 5 seconds, capture a frame and ask AI what it is silently
+      visionIntervalRef.current = setInterval(async () => {
+        if (isProcessing) return;
+        
+        const frame = captureVideoFrame();
+        if (!frame) return;
+
+        isProcessing = true;
+        try {
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+          const response = await fetch(`${baseUrl}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              message: "Identify the main object in this image. Reply with ONLY 1 to 4 words. No markdown, no extra text.", 
+              image: frame, 
+              modelType: 'flash', // Fast vision model
+              allowAutomation: false,
+              history: [], // Do not pollute chat history with background scanning
+              projectId 
+            })
+          });
+
+          if (response.ok) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let finalAnswer = "";
+            let buffer = "";
+
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              
+              buffer += decoder.decode(value, { stream: true }); 
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('data: ') && !trimmed.includes('[DONE]')) {
+                  try {
+                    const data = JSON.parse(trimmed.substring(6));
+                    if (data.text) finalAnswer += data.text;
+                  } catch(e) {}
+                }
+              }
+            }
+            
+            // Speak the detected object if voice is enabled
+            if (finalAnswer.trim()) {
+              speakText(`I see ${finalAnswer.trim().replace(/[*#.`]/g, '')}`);
+            }
+          }
+        } catch (e) {
+          console.error("Live Vision Fetch Error:", e);
+        } finally {
+          isProcessing = false;
+        }
+      }, 5000); 
+    }
+
+    return () => {
+      if (visionIntervalRef.current) clearInterval(visionIntervalRef.current);
+    };
+  }, [activeVideoSource, captureVideoFrame, projectId, setVoiceEnabled, speakText]);
+
   const models = [
     { id: 'flash', name: '⚡ Gemini 2.0 Flash' },
     { id: 'flash-lite', name: '🍃 Gemini Flash Lite' },
@@ -55,30 +130,23 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     { id: 'smartsphere-rag', name: '📚 SmartSphere (My Data)' }
   ];
 
-  // ⚡ UPGRADED: Real-time Voice Interaction
   const handleMicClick = () => {
     setShowTextInput(true); 
-    setVoiceEnabled(true); // Automatically enable AI voice when user uses mic
+    setVoiceEnabled(true); 
 
     toggleRecording(
-      // 1. Final Result: Auto-send to AI
       (finalText) => {
         setInput(finalText);
         handleSend(null, finalText); 
       },
-      // 2. Interim Result: Show live typing
-      (liveText) => {
-        setInput(liveText);
-      }
+      (liveText) => setInput(liveText)
     );
   };
 
-  // ⚡ UPGRADED: Added overrideText parameter for instant voice sending
   const handleSend = async (e, overrideText = null) => {
     e?.preventDefault();
     
     const textToSend = overrideText !== null ? overrideText : input;
-    
     if (isLoading || (!textToSend.trim() && !selectedImage && !activeVideoSource)) return;
 
     unlockAudio(); 
@@ -141,9 +209,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
                   return updated;
                 });
               }
-            } catch (_e) {
-              // Silently ignore incomplete JSON fragments if they slip through
-            }
+            } catch (_e) {}
           }
         }
       }
@@ -194,18 +260,28 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
     setShowSaveDialog(null);
   };
 
+  // ⚡ NEW: Upgraded Image Parser forces Pollinations.ai links directly into inline images
   const renderMessageText = (text) => {
     if (!text) return "";
-    const imgRegex = /!\[.*?\]\((.*?)\)/g;
+    
+    // Regex matches: 
+    // 1. Standard markdown ![alt](url)
+    // 2. Clickable markdown [text](pollinations_url)
+    // 3. Raw pollinations URLs https://image.pollinations.ai/...
+    const combinedRegex = /!\[.*?\]\((.*?)\)|\[.*?\]\((https:\/\/image\.pollinations\.ai[^\)]+)\)|(https:\/\/image\.pollinations\.ai[^\s\)]+)/g;
+    
     const parts = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = imgRegex.exec(text)) !== null) {
+    while ((match = combinedRegex.exec(text)) !== null) {
       if (match.index > lastIndex) {
         parts.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex, match.index)}</span>);
       }
-      const imgUrl = match[1];
+      
+      // Grab whichever capture group triggered the match
+      const imgUrl = match[1] || match[2] || match[3];
+      
       parts.push(
         <div key={`img-${match.index}`} className="relative group mt-3 mb-3 block">
           <img src={imgUrl} alt="AI Gen" className="rounded-xl max-h-64 object-cover border border-white/10 shadow-lg" />
@@ -216,7 +292,7 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
           </div>
         </div>
       );
-      lastIndex = imgRegex.lastIndex;
+      lastIndex = combinedRegex.lastIndex;
     }
     if (lastIndex < text.length) parts.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex)}</span>);
     return parts.length > 0 ? parts : text;
@@ -354,11 +430,17 @@ export default function ChatCore({ projectId = 'default', _isCompact = false }) 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* LIVE VIDEO PREVIEW */}
+      {/* ⚡ NEW: LIVE VIDEO PREVIEW WITH VISION BADGE */}
       <div className={`p-2 bg-black/40 border-t border-white/10 flex justify-center backdrop-blur-md ${activeVideoSource ? 'flex' : 'hidden'}`}>
         <div className="relative rounded-xl overflow-hidden border-2 border-amber-500/30 shadow-2xl">
+          {activeVideoSource === 'camera' && (
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md border border-amber-500/30">
+              <span className="w-1.5 h-1.5 bg-red-500 animate-pulse rounded-full"></span>
+              <span className="text-[9px] text-amber-500 font-bold tracking-widest uppercase">Live Vision</span>
+            </div>
+          )}
           <video ref={videoRef} className={`h-32 bg-black object-contain ${activeVideoSource === 'camera' ? 'scale-x-[-1]' : ''}`} muted playsInline />
-          <button onClick={stopVideo} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white hover:bg-red-500"><X size={12} /></button>
+          <button onClick={stopVideo} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white hover:bg-red-500 z-10"><X size={12} /></button>
         </div>
         <canvas ref={canvasRef} className="hidden" />
       </div>
