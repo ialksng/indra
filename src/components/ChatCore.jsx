@@ -118,7 +118,7 @@ export default function ChatCore() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const ws = new WebSocket(
-        `${import.meta.env.VITE_API_BASE_URL.replace("http", "ws")}/ws/voice`
+        `wss://indra-ai-core.onrender.com/ws/voice`
       );
 
       mediaRecorderRef.current = { ws };
@@ -208,7 +208,7 @@ export default function ChatCore() {
         try {
           setIsLoading(true);
           const res = await fetch(
-            `${import.meta.env.VITE_API_BASE_URL}/voice?mode=${selectedModel}`,
+            `${import.meta.env.VITE_API_BASE_URL}/voice`,
             { method: 'POST', body: formData }
           );
 
