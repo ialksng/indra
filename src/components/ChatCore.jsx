@@ -1,7 +1,20 @@
 import { useState, useRef } from 'react';
 import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
 import './ChatCore.css'; 
-import apiClient from '../services/apiClient'; // ✅ Added apiClient import
+import apiClient from '../services/apiClient';
+
+// Helper function for WebSocket streaming (kept outside to avoid recreation on render)
+function floatTo16BitPCM(float32Arr) {
+  const buffer = new ArrayBuffer(float32Arr.length * 2);
+  const view = new DataView(buffer);
+
+  for (let i = 0; i < float32Arr.length; i++) {
+    let s = Math.max(-1, Math.min(1, float32Arr[i]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+
+  return buffer;
+}
 
 export default function ChatCore() {
   // Pure UI State
@@ -25,14 +38,15 @@ export default function ChatCore() {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
-  // ✅ Updated handleSend with actual backend API call
+  // =========================
+  // 💬 TEXT CHAT
+  // =========================
   const handleSend = async (e) => {
     e?.preventDefault();
     if (!input.trim() && !selectedImage && !activeVideoSource) return;
     
     const userMessage = input;
 
-    // Visually add user message, clear inputs
     setMessages(prev => [...prev, { role: 'user', text: userMessage, image: selectedImage }]);
     setInput('');
     setSelectedImage(null);
@@ -41,14 +55,12 @@ export default function ChatCore() {
     setIsLoading(true);
 
     try {
-      // 🚀 Make the API request to the backend using your apiClient
       const response = await apiClient.post('/api/v1/indra/chat', {
         message: userMessage,
         mode: selectedModel,
         agent: automationEnabled
       });
 
-      // ✅ Add the AI's response to the chat window
       setMessages(prev => [...prev, { 
         role: 'ai', 
         text: response.data.message
@@ -66,7 +78,82 @@ export default function ChatCore() {
   };
 
   // =========================
-  // 🎤 VOICE LOGIC (MERGED)
+  // 🎤 STREAMING VOICE (NEW)
+  // =========================
+  const startStreamingVoice = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const ws = new WebSocket(
+        `${import.meta.env.VITE_API_BASE_URL.replace("http", "ws")}/ws/voice`
+      );
+
+      mediaRecorderRef.current = { ws }; // reuse your ref
+
+      // 🔄 Fallback trigger if WebSocket fails to connect
+      ws.onerror = (err) => {
+        console.error("WebSocket error, falling back to REST:", err);
+        ws.close();
+        startRecording(); 
+      };
+
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      processor.onaudioprocess = (e) => {
+        // Only send if socket is actually open
+        if (ws.readyState === WebSocket.OPEN) {
+          const input = e.inputBuffer.getChannelData(0);
+          ws.send(floatTo16BitPCM(input));
+        }
+      };
+
+      ws.onmessage = async (event) => {
+        // 🔊 AUDIO CHUNKS
+        if (event.data instanceof Blob) {
+          const audio = new Audio(URL.createObjectURL(event.data));
+          audio.play();
+          return;
+        }
+
+        // 🧠 TEXT EVENTS
+        const data = JSON.parse(event.data);
+
+        if (data.type === "transcript") {
+          setMessages(prev => [
+            ...prev,
+            { role: "user", text: data.text }
+          ]);
+        }
+
+        if (data.type === "response") {
+          setMessages(prev => [
+            ...prev,
+            { role: "ai", text: data.text }
+          ]);
+        }
+      };
+
+    } catch (err) {
+      console.error("Streaming setup error, falling back:", err);
+      startRecording(); // Fallback if Mic setup/WS initialization totally fails
+    }
+  };
+
+  const stopStreamingVoice = () => {
+    const ws = mediaRecorderRef.current?.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send("interrupt"); // 🔥 stop AI speaking
+      ws.close();
+    }
+  };
+
+  // =========================
+  // 🎤 FALLBACK VOICE (OLD)
   // =========================
   const startRecording = async () => {
     try {
@@ -82,19 +169,14 @@ export default function ChatCore() {
 
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-
         const formData = new FormData();
         formData.append('file', blob);
 
         try {
           setIsLoading(true);
-
           const res = await fetch(
             `${import.meta.env.VITE_API_BASE_URL}/voice?mode=${selectedModel}`,
-            {
-              method: 'POST',
-              body: formData
-            }
+            { method: 'POST', body: formData }
           );
 
           const data = await res.json();
@@ -106,14 +188,12 @@ export default function ChatCore() {
           ]);
 
           if (data.audio_url) {
-            const audio = new Audio(
-              `${import.meta.env.VITE_API_BASE_URL}${data.audio_url}`
-            );
+            const audio = new Audio(`${import.meta.env.VITE_API_BASE_URL}${data.audio_url}`);
             audio.play();
           }
 
         } catch (err) {
-          console.error("Voice error:", err);
+          console.error("Voice fallback error:", err);
         } finally {
           setIsLoading(false);
         }
@@ -127,16 +207,26 @@ export default function ChatCore() {
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current instanceof MediaRecorder) {
+      mediaRecorderRef.current.stop();
+    }
   };
 
+  // =========================
+  // 🎤 TOGGLE CONTROLLER
+  // =========================
   const toggleVoice = () => {
     if (!voiceEnabled) {
       setVoiceEnabled(true);
-      startRecording();
+      startStreamingVoice(); // 🚀 Tries WS first, handles fallback internally
     } else {
       setVoiceEnabled(false);
-      stopRecording();
+      // Safely route to the correct stop function based on what is active
+      if (mediaRecorderRef.current?.ws) {
+        stopStreamingVoice(); 
+      } else {
+        stopRecording();
+      }
     }
   };
 
@@ -216,7 +306,6 @@ export default function ChatCore() {
         </div>
 
         <div className="indra-header-actions">
-          {/* ✅ Integrated toggleVoice function here */}
           <button 
             onClick={toggleVoice}
             className={`indra-voice-btn ${voiceEnabled ? 'active' : ''}`}
@@ -341,7 +430,6 @@ export default function ChatCore() {
                   <Search size={18} className="indra-menu-item-icon"/>
                   <span>SEARCH</span>
                 </button>
-                {/* ✅ Integrated toggleVoice function here */}
                 <button onClick={() => { toggleVoice(); setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
                   <Mic size={18} className="indra-menu-item-icon"/>
                   <span>VOICE</span>
