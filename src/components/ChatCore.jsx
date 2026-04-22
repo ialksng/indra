@@ -23,14 +23,14 @@ export default function ChatCore() {
   const [selectedModel, setSelectedModel] = useState('smart'); 
   const [automationEnabled, setAutomationEnabled] = useState(false); 
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [isAwake, setIsAwake] = useState(false); // 🔥 NEW: Wake state
+  const [isAwake, setIsAwake] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null); 
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultData, setVaultData] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(null); 
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 🔥 NEW: Paywall Modal
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -39,10 +39,10 @@ export default function ChatCore() {
   const messagesEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const silenceTimerRef = useRef(null); // 🔥 NEW: React-safe silence timer
+  const silenceTimerRef = useRef(null);
 
   // =========================
-  // 🕒 AUTO SLEEP LOGIC (NEW)
+  // 🕒 AUTO SLEEP LOGIC
   // =========================
   const resetSilence = () => {
     clearTimeout(silenceTimerRef.current);
@@ -52,13 +52,12 @@ export default function ChatCore() {
     }, 5000); // 5 sec silence
   };
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => clearTimeout(silenceTimerRef.current);
   }, []);
 
   // =========================
-  // 💎 PAYWALL LOGIC (NEW)
+  // 💎 PAYWALL LOGIC 
   // =========================
   const handleModelChange = (mode) => {
     if (mode === "ultra") {
@@ -299,7 +298,7 @@ export default function ChatCore() {
               <button onClick={() => window.location.href = "/login"} className="indra-btn-secondary">
                 Login to Existing Account
               </button>
-              <button onClick={() => window.location.href = "/pricing"} className="indra-btn-primary" style={{ backgroundColor: '#fbbf24', color: '#000' }}>
+              <button onClick={() => window.location.href = "/dashboard"} className="indra-btn-primary" style={{ backgroundColor: '#fbbf24', color: '#000' }}>
                 Buy Premium
               </button>
             </div>
@@ -343,6 +342,12 @@ export default function ChatCore() {
 
       {/* HEADER */}
       <div className="indra-header">
+        
+        {/* 🔥 RESTORED LOGO/BRAND WRAPPER */}
+        <div className="indra-header-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Insert your website logo and redirect external link icon here */}
+        </div>
+
         <div className="indra-model-toggle">
           {['lite', 'smart', 'ultra'].map((mode) => (
             <button
@@ -356,7 +361,7 @@ export default function ChatCore() {
         </div>
 
         <div className="indra-header-actions">
-          {/* 🔥 NEW: Waveform Indicator */}
+          {/* Waveform Indicator */}
           {voiceEnabled && (
             <div className={`indra-voice-wave ${isAwake ? "active" : ""}`}>
               <span></span><span></span><span></span>
@@ -452,7 +457,7 @@ export default function ChatCore() {
           </div>
         )}
 
-        {/* 🔥 NEW: Floating Manual Interrupt Button */}
+        {/* Floating Manual Interrupt Button */}
         {voiceEnabled && isAwake && (
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
              <button onClick={interruptAI} className="indra-btn-secondary" style={{ padding: '0.5rem 1rem', borderRadius: '999px', fontSize: '0.8rem', gap: '0.5rem' }}>
