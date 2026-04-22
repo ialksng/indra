@@ -643,3 +643,62 @@
   box-shadow: none;
   border: 1px solid var(--border-light);
 }
+
+/* Voice Waveform Animations */
+.indra-voice-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  margin-right: 12px;
+  opacity: 0.3; /* Dimmed when listening but not awake */
+  transition: opacity 0.3s ease;
+}
+
+.indra-voice-wave.active {
+  opacity: 1; /* Brightens up when awake/speaking */
+}
+
+.indra-voice-wave span {
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  background: #facc15;
+  border-radius: 2px;
+}
+
+.indra-voice-wave.active span {
+  animation: indra-wave 1s infinite ease-in-out;
+}
+
+.indra-voice-wave span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.indra-voice-wave span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes indra-wave {
+  0%, 100% { height: 5px; }
+  50% { height: 18px; }
+}
+
+/* Premium Model Button Highlight */
+.indra-premium-btn {
+  background: linear-gradient(45deg, rgba(251, 191, 36, 0.1), transparent);
+  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+  color: #fbbf24 !important;
+}
+
+.indra-premium-btn.active {
+  background: rgba(251, 191, 36, 0.2) !important;
+  border: 1px solid #fbbf24 !important;
+}
+
+/* Active Mic state colors */
+.indra-voice-btn.awake {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border-color: #fbbf24;
+}

@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react';
-import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search, Square } from 'lucide-react';
 import './ChatCore.css'; 
 import apiClient from '../services/apiClient';
 
-// Helper function for WebSocket streaming (kept outside to avoid recreation on render)
+// Helper function for WebSocket streaming
 function floatTo16BitPCM(float32Arr) {
   const buffer = new ArrayBuffer(float32Arr.length * 2);
   const view = new DataView(buffer);
@@ -23,12 +23,14 @@ export default function ChatCore() {
   const [selectedModel, setSelectedModel] = useState('smart'); 
   const [automationEnabled, setAutomationEnabled] = useState(false); 
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isAwake, setIsAwake] = useState(false); // 🔥 NEW: Wake state
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null); 
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultData, setVaultData] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(null); 
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 🔥 NEW: Paywall Modal
   const [activeVideoSource, setActiveVideoSource] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -37,6 +39,38 @@ export default function ChatCore() {
   const messagesEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const silenceTimerRef = useRef(null); // 🔥 NEW: React-safe silence timer
+
+  // =========================
+  // 🕒 AUTO SLEEP LOGIC (NEW)
+  // =========================
+  const resetSilence = () => {
+    clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = setTimeout(() => {
+      setIsAwake(false);
+      console.log("😴 Indra sleeping");
+    }, 5000); // 5 sec silence
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(silenceTimerRef.current);
+  }, []);
+
+  // =========================
+  // 💎 PAYWALL LOGIC (NEW)
+  // =========================
+  const handleModelChange = (mode) => {
+    if (mode === "ultra") {
+      const user = JSON.parse(localStorage.getItem("userInfo"));
+
+      if (!user || !user.isPremium) {
+        setShowUpgradeModal(true);
+        return;
+      }
+    }
+    setSelectedModel(mode);
+  };
 
   // =========================
   // 💬 TEXT CHAT
@@ -78,7 +112,7 @@ export default function ChatCore() {
   };
 
   // =========================
-  // 🎤 STREAMING VOICE (NEW)
+  // 🎤 STREAMING VOICE 
   // =========================
   const startStreamingVoice = async () => {
     try {
@@ -88,9 +122,8 @@ export default function ChatCore() {
         `${import.meta.env.VITE_API_BASE_URL.replace("http", "ws")}/ws/voice`
       );
 
-      mediaRecorderRef.current = { ws }; // reuse your ref
+      mediaRecorderRef.current = { ws };
 
-      // 🔄 Fallback trigger if WebSocket fails to connect
       ws.onerror = (err) => {
         console.error("WebSocket error, falling back to REST:", err);
         ws.close();
@@ -105,7 +138,6 @@ export default function ChatCore() {
       processor.connect(audioContext.destination);
 
       processor.onaudioprocess = (e) => {
-        // Only send if socket is actually open
         if (ws.readyState === WebSocket.OPEN) {
           const input = e.inputBuffer.getChannelData(0);
           ws.send(floatTo16BitPCM(input));
@@ -113,59 +145,61 @@ export default function ChatCore() {
       };
 
       ws.onmessage = async (event) => {
-        // 🔊 AUDIO CHUNKS
         if (event.data instanceof Blob) {
           const audio = new Audio(URL.createObjectURL(event.data));
           audio.play();
           return;
         }
 
-        // 🧠 TEXT EVENTS
         const data = JSON.parse(event.data);
 
+        // 🔥 WAKE WORD & TRANSCRIPT LOGIC
         if (data.type === "transcript") {
-          setMessages(prev => [
-            ...prev,
-            { role: "user", text: data.text }
-          ]);
+          const text = data.text.toLowerCase();
+
+          if (!isAwake && text.includes("indra")) {
+            setIsAwake(true);
+            console.log("🔥 Indra Activated");
+            resetSilence();
+            return;
+          }
+
+          if (isAwake) {
+            resetSilence();
+            setMessages(prev => [...prev, { role: "user", text: data.text }]);
+          }
         }
 
-        if (data.type === "response") {
-          setMessages(prev => [
-            ...prev,
-            { role: "ai", text: data.text }
-          ]);
+        if (data.type === "response" && isAwake) {
+          setMessages(prev => [...prev, { role: "ai", text: data.text }]);
         }
       };
 
     } catch (err) {
       console.error("Streaming setup error, falling back:", err);
-      startRecording(); // Fallback if Mic setup/WS initialization totally fails
+      startRecording();
     }
   };
 
   const stopStreamingVoice = () => {
     const ws = mediaRecorderRef.current?.ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send("interrupt"); // 🔥 stop AI speaking
+      ws.send("interrupt"); 
       ws.close();
     }
   };
 
   // =========================
-  // 🎤 FALLBACK VOICE (OLD)
+  // 🎤 FALLBACK VOICE 
   // =========================
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
-      recorder.ondataavailable = (e) => {
-        chunksRef.current.push(e.data);
-      };
+      recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
 
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
@@ -180,7 +214,6 @@ export default function ChatCore() {
           );
 
           const data = await res.json();
-
           setMessages(prev => [
             ...prev,
             { role: 'user', text: data.input_text || '[voice]' },
@@ -191,7 +224,6 @@ export default function ChatCore() {
             const audio = new Audio(`${import.meta.env.VITE_API_BASE_URL}${data.audio_url}`);
             audio.play();
           }
-
         } catch (err) {
           console.error("Voice fallback error:", err);
         } finally {
@@ -200,7 +232,6 @@ export default function ChatCore() {
       };
 
       recorder.start();
-
     } catch (err) {
       console.error("Mic error:", err);
     }
@@ -212,21 +243,26 @@ export default function ChatCore() {
     }
   };
 
-  // =========================
-  // 🎤 TOGGLE CONTROLLER
-  // =========================
   const toggleVoice = () => {
     if (!voiceEnabled) {
       setVoiceEnabled(true);
-      startStreamingVoice(); // 🚀 Tries WS first, handles fallback internally
+      startStreamingVoice(); 
     } else {
       setVoiceEnabled(false);
-      // Safely route to the correct stop function based on what is active
+      setIsAwake(false);
+      clearTimeout(silenceTimerRef.current);
       if (mediaRecorderRef.current?.ws) {
         stopStreamingVoice(); 
       } else {
         stopRecording();
       }
+    }
+  };
+
+  const interruptAI = () => {
+    const ws = mediaRecorderRef.current?.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send("interrupt");
     }
   };
 
@@ -251,6 +287,26 @@ export default function ChatCore() {
     <div id="indra-chat-core-container" className="indra-container">
       
       {/* MODALS */}
+      {showUpgradeModal && (
+        <div className="indra-modal-overlay">
+          <div className="indra-modal-content indra-modal-md" style={{ textAlign: 'center' }}>
+            <div className="indra-modal-header" style={{ justifyContent: 'center' }}>
+              <h3 className="indra-modal-title" style={{ fontSize: '1.2rem', color: '#fbbf24' }}>Upgrade to Ultra 🚀</h3>
+              <button onClick={() => setShowUpgradeModal(false)} className="indra-icon-btn" style={{ position: 'absolute', right: '1rem' }}><X size={20}/></button>
+            </div>
+            <p style={{ margin: '1rem 0', color: '#9ca3af' }}>Unlock real-time voice, premium AI, and advanced features.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button onClick={() => window.location.href = "/login"} className="indra-btn-secondary">
+                Login to Existing Account
+              </button>
+              <button onClick={() => window.location.href = "/pricing"} className="indra-btn-primary" style={{ backgroundColor: '#fbbf24', color: '#000' }}>
+                Buy Premium
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSaveDialog && (
         <div className="indra-modal-overlay">
           <div className="indra-modal-content indra-modal-sm">
@@ -260,12 +316,8 @@ export default function ChatCore() {
             </div>
             <img src={showSaveDialog} crossOrigin="anonymous" className="indra-preview-img" alt="Preview" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <button className="indra-btn-primary">
-                <Download size={18} /> Download to Device
-              </button>
-              <button onClick={() => { setIsVaultOpen(true); setShowSaveDialog(null); }} className="indra-btn-secondary">
-                <Cloud size={18} /> Save to SmartSphere
-              </button>
+              <button className="indra-btn-primary"><Download size={18} /> Download to Device</button>
+              <button onClick={() => { setIsVaultOpen(true); setShowSaveDialog(null); }} className="indra-btn-secondary"><Cloud size={18} /> Save to SmartSphere</button>
             </div>
           </div>
         </div>
@@ -291,14 +343,12 @@ export default function ChatCore() {
 
       {/* HEADER */}
       <div className="indra-header">
-        
-        {/* 3-Way Toggle */}
         <div className="indra-model-toggle">
           {['lite', 'smart', 'ultra'].map((mode) => (
             <button
               key={mode}
-              onClick={() => setSelectedModel(mode)}
-              className={`indra-toggle-btn ${selectedModel === mode ? 'active' : ''}`}
+              onClick={() => handleModelChange(mode)}
+              className={`indra-toggle-btn ${selectedModel === mode ? 'active' : ''} ${mode === 'ultra' ? 'indra-premium-btn' : ''}`}
             >
               {mode}
             </button>
@@ -306,9 +356,16 @@ export default function ChatCore() {
         </div>
 
         <div className="indra-header-actions">
+          {/* 🔥 NEW: Waveform Indicator */}
+          {voiceEnabled && (
+            <div className={`indra-voice-wave ${isAwake ? "active" : ""}`}>
+              <span></span><span></span><span></span>
+            </div>
+          )}
+
           <button 
             onClick={toggleVoice}
-            className={`indra-voice-btn ${voiceEnabled ? 'active' : ''}`}
+            className={`indra-voice-btn ${voiceEnabled ? (isAwake ? 'awake' : 'active') : ''}`}
           >
             {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
@@ -395,6 +452,15 @@ export default function ChatCore() {
           </div>
         )}
 
+        {/* 🔥 NEW: Floating Manual Interrupt Button */}
+        {voiceEnabled && isAwake && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+             <button onClick={interruptAI} className="indra-btn-secondary" style={{ padding: '0.5rem 1rem', borderRadius: '999px', fontSize: '0.8rem', gap: '0.5rem' }}>
+               <Square size={14} fill="currentColor"/> STOP AI
+             </button>
+          </div>
+        )}
+
         <input type="file" accept="image/*" ref={fileInputRef} onChange={handleDeviceUpload} style={{ display: 'none' }} />
 
         {isInputModeActive ? (
@@ -420,11 +486,7 @@ export default function ChatCore() {
           </div>
         ) : (
           <div className="indra-center-hub">
-            
-            {/* ⚡ COMPACT EXPANDING DOCK */}
             <div className={`indra-action-dock ${showActionMenu ? 'open' : ''}`}>
-              
-              {/* Left Icons */}
               <div className="indra-dock-side left">
                 <button onClick={() => { setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
                   <Search size={18} className="indra-menu-item-icon"/>
@@ -440,10 +502,8 @@ export default function ChatCore() {
                 </button>
               </div>
 
-              {/* Spacer for the absolute positioned main button */}
               <div className="indra-dock-spacer"></div>
 
-              {/* Right Icons */}
               <div className="indra-dock-side right">
                 <button onClick={() => { setActiveVideoSource('screen'); setShowTextInput(true); setShowActionMenu(false); }} className="indra-menu-item">
                   <MonitorUp size={18} className="indra-menu-item-icon"/>
@@ -460,7 +520,6 @@ export default function ChatCore() {
               </div>
             </div>
 
-            {/* Main Center Button */}
             <button 
               onClick={() => setShowActionMenu(!showActionMenu)}
               className={`indra-thunder-btn ${showActionMenu ? 'open' : ''}`}
