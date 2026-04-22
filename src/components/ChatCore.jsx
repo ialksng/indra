@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search, Square } from 'lucide-react';
+import { Send, Loader2, X, Camera, Database, HardDrive, MonitorUp, Zap, MousePointerClick, Mic, Volume2, VolumeX, Download, Cloud, Search, Square, ExternalLink } from 'lucide-react';
 import './ChatCore.css'; 
 import apiClient from '../services/apiClient';
 
@@ -343,9 +343,24 @@ export default function ChatCore() {
       {/* HEADER */}
       <div className="indra-header">
         
-        {/* 🔥 RESTORED LOGO/BRAND WRAPPER */}
-        <div className="indra-header-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {/* Insert your website logo and redirect external link icon here */}
+        {/* 🔥 FULLY RESTORED LOGO AND REDIRECT BUTTON */}
+        <div className="indra-header-brand" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img 
+            src="/favicon.png" 
+            alt="Indra Logo" 
+            style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} 
+            onError={(e) => { e.target.style.display = 'none'; }} 
+          />
+          <a 
+            href="https://indra.ialksng.me" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="indra-icon-btn" 
+            style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', textDecoration: 'none' }}
+            title="Visit Website"
+          >
+            <ExternalLink size={18} />
+          </a>
         </div>
 
         <div className="indra-model-toggle">
