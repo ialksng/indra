@@ -9,18 +9,28 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 1. Check if user is logged in locally
     const userInfo = localStorage.getItem('userInfo');
     if (!userInfo) {
       navigate('/login');
       return;
     }
 
-    // 2. Fetch fresh user telemetry from your backend
     apiClient.get('/api/v1/auth/me')
       .then((res) => {
         setUserData(res.data);
         setLoading(false);
+        
+        // 🔥 Keep local storage in sync with fresh DB data (Fix for ChatCore)
+        try {
+          const currentLocal = JSON.parse(userInfo);
+          const updatedLocal = {
+            ...currentLocal,
+            isPremium: res.data.subscription?.plan === 'ultra'
+          };
+          localStorage.setItem('userInfo', JSON.stringify(updatedLocal));
+        } catch(e) {
+          console.error("Failed to sync local storage");
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -36,10 +46,8 @@ export default function Dashboard() {
 
   const handleUpgrade = async (planType) => {
     try {
-      // Create the order on your backend
       const { data } = await apiClient.post('/api/v1/payments/create-subscription', { planType });
       
-      // Open Razorpay
       const options = {
         key: data.keyId,
         subscription_id: data.subscriptionId,
@@ -47,7 +55,6 @@ export default function Dashboard() {
         description: `Upgrade to ${planType.toUpperCase()}`,
         theme: { color: "#fbbf24" },
         handler: async function (response) {
-          // Verify on backend after payment
           await apiClient.post('/api/v1/payments/verify', { ...response, planType });
           window.location.reload(); 
         },
@@ -61,7 +68,6 @@ export default function Dashboard() {
 
   if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a', color: '#fbbf24' }}><Zap className="animate-pulse" size={40}/></div>;
 
-  // Set limits based on the user's plan returned from the DB
   const { name, email, subscription, usage } = userData;
   const tokenLimit = subscription.plan === 'lite' ? 5000 : subscription.plan === 'smart' ? 50000 : 'Unlimited';
   const voiceLimit = subscription.plan === 'lite' ? 5 : subscription.plan === 'smart' ? 60 : 'Unlimited';

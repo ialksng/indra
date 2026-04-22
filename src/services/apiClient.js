@@ -30,7 +30,7 @@ apiClient.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.warn("[Indra] Unauthorized or token expired. Clearing local session.");
       localStorage.removeItem('userInfo');
-      // Optional: Force a reload or redirect to login if it happens mid-session
+      // Uncomment the line below if you want it to forcefully kick them to login
       // window.location.href = '/login'; 
     }
     return Promise.reject(error);
