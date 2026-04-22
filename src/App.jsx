@@ -1,14 +1,24 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import IndraWebsite from './pages/IndraWebsite';
 import IndraWidget from './pages/IndraWidget';
+import ChatCore from './components/ChatCore';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
 
-export default function App() {
+function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Routes>
         <Route path="/" element={<IndraWebsite />} />
         <Route path="/widget" element={<IndraWidget />} />
+        <Route path="/chat" element={<ChatCore />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
+
+export default App;
