@@ -89,6 +89,7 @@ export default function ChatCore() {
 
     try {
       const response = await apiClient.post('/api/v1/indra/chat', {
+        user_id: "default_user",
         message: userMessage,
         mode: selectedModel,
         agent: automationEnabled
