@@ -76,6 +76,10 @@ export default function ChatCore() {
   // =========================
   const handleSend = async (e) => {
     e?.preventDefault();
+    
+    // ✅ FIX 1: Prevent spam. If already waiting for AI, ignore the click/Enter.
+    if (isLoading) return; 
+    
     if (!input.trim() && !selectedImage && !activeVideoSource) return;
     
     const userMessage = input;
@@ -494,9 +498,17 @@ export default function ChatCore() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend(e)}
-                placeholder="Type your command..."
-                className="indra-main-input"
+                // ✅ FIX 2: Block Enter key if AI is still processing
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!isLoading) handleSend(e);
+                  }
+                }}
+                // ✅ FIX 3: Visually disable the input and change placeholder while loading
+                disabled={isLoading}
+                placeholder={isLoading ? "Indra is thinking..." : "Type your command..."}
+                className={`indra-main-input ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 autoFocus
               />
             </div>
